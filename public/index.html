@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Join a Room</title>
+  </head>
+  <body>
+    <h1>Join a Room</h1>
+    <form>
+      <label for="room">Enter room ID:</label>
+      <input type="text" id="room" name="room">
+      <button type="submit">Join</button>
+    </form>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+
+      document.querySelector('form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const roomId = document.getElementById('room').value;
+        window.location.href = `/counter.html?room=${roomId}`;
+      });
+    </script>
+  </body>
+</html>

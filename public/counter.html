@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Button Counter</title>
+  </head>
+  <body>
+    <h1>Button Counter</h1>
+    <p>Counter for room <span id="room"></span>: <span id="counter">0</span></p>
+    <button id="button">Click me!</button>
+
+    <span id="message"></span>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const roomId = new URLSearchParams(window.location.search).get('room');
+      document.getElementById('room').textContent = roomId;
+
+      socket.emit('joinRoom', roomId);
+
+      socket.on('roomJoined', (counter, is_creator) => {
+        document.getElementById('counter').textContent = counter;
+        if (is_creator) {
+            document.getElementById('message').textContent = "Bienvenue créateur !";
+        } else {
+            document.getElementById('message').textContent = "Vous êtes un simple utilisateur !";
+        }
+      });
+
+      socket.on(`counter:${roomId}`, (value) => {
+        document.getElementById('counter').textContent = value;
+      });
+
+      document.getElementById('button').addEventListener('click', () => {
+        socket.emit('buttonClick', roomId);
+      });
+    </script>
+  </body>
+</html>
