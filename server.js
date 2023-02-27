@@ -10,30 +10,35 @@ const data = {};
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  socket.on('joinRoom', (roomId) => {
+  socket.on('joinRoom', (roomId, pseudo) => {
     console.log(`User ${socket.id} joined room ${roomId}`);
     socket.join(roomId);
     let is_creator = false;
     if (!(roomId in data)) {
       data[roomId] = {
         counter: 0,
-        creator: socket.id, // set createdBy to the current socket's ID
+        creator: socket.id,
         users: {
-            id: {
-                'points': 0
+            [pseudo]: {
+                'score': 0
             }
         }
       }
       is_creator = true;
+    } else {
+      data[roomId]['users'][pseudo] = {
+        'score': 0
+      }
     }
-    socket.emit('roomJoined', data[roomId]['counter'], is_creator);
+    socket.emit('roomJoined', data[roomId], is_creator);
   });
 
-  socket.on('buttonClick', (roomId) => {
+  socket.on('buttonClick', (roomId, pseudo) => {
     console.log(`User ${socket.id} clicked button in room ${roomId}`);
     if (roomId in data) {
         data[roomId]['counter']++;
-        io.to(roomId).emit(`counter:${roomId}`, data[roomId]['counter']);
+        data[roomId]['users'][pseudo]['score']++;
+        io.to(roomId).emit(`counter`, data[roomId]);
     } else {
         console.log(`User ${socket.id} clicked button in room ${roomId} but this room does not exist !`);
     }

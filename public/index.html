@@ -8,6 +8,8 @@
     <form>
       <label for="room">Enter room ID:</label>
       <input type="text" id="room" name="room">
+      <label for="room">Enter pseudo:</label>
+      <input type="test" id="pseudo" name="pseudo"> 
       <button type="submit">Join</button>
     </form>
 
@@ -18,7 +20,8 @@
       document.querySelector('form').addEventListener('submit', (event) => {
         event.preventDefault();
         const roomId = document.getElementById('room').value;
-        window.location.href = `/counter.html?room=${roomId}`;
+        const pseudo = document.getElementById('pseudo').value;
+        window.location.href = `/counter.html?room=${roomId}&pseudo=${pseudo}`;
       });
     </script>
   </body>

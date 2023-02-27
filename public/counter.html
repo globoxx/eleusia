@@ -6,19 +6,48 @@
   <body>
     <h1>Button Counter</h1>
     <p>Counter for room <span id="room"></span>: <span id="counter">0</span></p>
+    <p>Score: <span id="score">0</span></p> 
     <button id="button">Click me!</button>
 
-    <span id="message"></span>
+    <p id="message"></p>
+
+    <table id="leaderBoard">
+      <thead>
+        <tr>
+          <th>Pseudo</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody id="testBody"></tbody>
+    </table>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
       const socket = io();
-      const roomId = new URLSearchParams(window.location.search).get('room');
+      const url_search_params = new URLSearchParams(window.location.search)
+      const roomId = url_search_params.get('room');
+      const pseudo = url_search_params.get('pseudo');
+      let score = 0
+
+      function loadTableData(users) {
+        const table = document.getElementById("testBody");
+        table.innerHTML = ''
+        for (const [user_pseudo, user_data] of Object.entries(users)) {
+          let row = table.insertRow(-1);
+          let pseudo_cell = row.insertCell(0);
+          pseudo_cell.innerHTML = user_pseudo;
+          let score_cell = row.insertCell(1);
+          score_cell.innerHTML = user_data['score'];
+        };
+      }
+
       document.getElementById('room').textContent = roomId;
 
-      socket.emit('joinRoom', roomId);
+      socket.emit('joinRoom', roomId, pseudo);
 
-      socket.on('roomJoined', (counter, is_creator) => {
+      socket.on('roomJoined', (data, is_creator) => {
+        counter = data['counter']
+        loadTableData(data['users']);
         document.getElementById('counter').textContent = counter;
         if (is_creator) {
             document.getElementById('message').textContent = "Bienvenue créateur !";
@@ -27,12 +56,16 @@
         }
       });
 
-      socket.on(`counter:${roomId}`, (value) => {
-        document.getElementById('counter').textContent = value;
+      socket.on(`counter`, (data) => {
+        counter = data['counter']
+        score = data['users'][pseudo]['score']
+        loadTableData(data['users']);
+        document.getElementById('counter').textContent = counter;
+        document.getElementById('score').textContent = score;
       });
 
       document.getElementById('button').addEventListener('click', () => {
-        socket.emit('buttonClick', roomId);
+        socket.emit('buttonClick', roomId, pseudo);
       });
     </script>
   </body>
