@@ -41,9 +41,9 @@
         };
       }
 
-      document.getElementById('room').textContent = roomId;
-
       socket.emit('joinRoom', roomId, pseudo);
+
+      document.getElementById('room').textContent = roomId;
 
       socket.on('roomJoined', (data, is_creator) => {
         counter = data['counter']
