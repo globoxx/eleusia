@@ -36,7 +36,7 @@ io.on('connection', (socket) => {
         'score': 0
       }
       const is_creator = pseudo === data[roomId]['creator'];
-      io.to(roomId).emit('roomJoined', data[roomId], is_creator);
+      io.to(roomId).emit('roomJoined', data[roomId]);
     } else {
       console.log('ROOM NOT FOUND');
     }

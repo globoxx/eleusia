@@ -29,6 +29,10 @@
       const pseudo = url_search_params.get('pseudo');
       let score = 0
 
+      socket.emit('joinRoom', roomId, pseudo);
+
+      document.getElementById('room').textContent = roomId;
+
       function loadTableData(users) {
         const table = document.getElementById("testBody");
         table.innerHTML = ''
@@ -41,14 +45,11 @@
         };
       }
 
-      socket.emit('joinRoom', roomId, pseudo);
-
-      document.getElementById('room').textContent = roomId;
-
-      socket.on('roomJoined', (data, is_creator) => {
+      socket.on('roomJoined', (data) => {
         counter = data['counter']
         loadTableData(data['users']);
         document.getElementById('counter').textContent = counter;
+        const is_creator = pseudo === data['creator'];
         if (is_creator) {
             document.getElementById('message').textContent = "Bienvenue créateur !";
         } else {
