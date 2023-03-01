@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Button Counter</title>
+    <title>Time to play !></span></title>
   </head>
   <body>
-    <h1>Button Counter</h1>
-    <p>Counter for room <span id="room"></span>: <span id="counter">0</span></p>
+    <h1>Room <span id="room"></span></h1>
+    <p>Counter: <span id="counter">0</span></p>
     <p>Score: <span id="score">0</span></p> 
     <button id="button">Click me!</button>
 
     <p id="message"></p>
+
+    <p>Timer: <span id="timer"></span></p>
 
     <table id="leaderBoard">
       <thead>
@@ -21,13 +23,18 @@
       <tbody id="testBody"></tbody>
     </table>
 
+    <div id="game-controls">
+      <button id="start-button" style="display: none;">Start game</button>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
       const socket = io();
-      const url_search_params = new URLSearchParams(window.location.search)
+      const url_search_params = new URLSearchParams(window.location.search);
       const roomId = url_search_params.get('room');
       const pseudo = url_search_params.get('pseudo');
-      let score = 0
+      let score = 0;
+      let timer = 30;
 
       socket.emit('joinRoom', roomId, pseudo);
 
@@ -35,7 +42,7 @@
 
       function loadTableData(users) {
         const table = document.getElementById("testBody");
-        table.innerHTML = ''
+        table.innerHTML = '';
         for (const [user_pseudo, user_data] of Object.entries(users)) {
           let row = table.insertRow(-1);
           let pseudo_cell = row.insertCell(0);
@@ -52,6 +59,7 @@
         const is_creator = pseudo === data['creator'];
         if (is_creator) {
             document.getElementById('message').textContent = "Bienvenue créateur !";
+            document.getElementById('start-button').style.display = 'block';
         } else {
             document.getElementById('message').textContent = "Vous êtes un simple utilisateur !";
         }
@@ -65,8 +73,17 @@
         document.getElementById('score').textContent = score;
       });
 
+      socket.on(`timer`, (timer) => {
+        document.getElementById('timer').textContent = timer;
+      });
+
       document.getElementById('button').addEventListener('click', () => {
         socket.emit('buttonClick', roomId, pseudo);
+      });
+
+      document.getElementById('start-button').addEventListener('click', () => {
+        socket.emit('startGame', roomId);
+        document.getElementById('start-button').style.display = 'none';
       });
     </script>
   </body>

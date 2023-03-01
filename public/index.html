@@ -23,7 +23,6 @@
 
       socket.on('updateRooms', (available_rooms) => {
         rooms = available_rooms;
-        alert("Nouvelle room disponible: " + rooms)
       })
 
       document.getElementById('create-room').addEventListener('click', () => {
