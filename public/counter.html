@@ -27,6 +27,8 @@
       <button id="start-button" style="display: none;">Start game</button>
     </div>
 
+    <div id="image-container"></div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
       const socket = io();
@@ -75,6 +77,17 @@
 
       socket.on(`timer`, (timer) => {
         document.getElementById('timer').textContent = timer;
+      });
+
+      socket.on('showImage', image_path => {
+        // Create a new image element
+        const image = new Image();
+        image.src = image_path;
+
+        // Add the image to the page
+        const imageContainer = document.getElementById('image-container');
+        imageContainer.innerHTML = '';
+        imageContainer.appendChild(image);
       });
 
       document.getElementById('button').addEventListener('click', () => {

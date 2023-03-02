@@ -2,15 +2,20 @@ const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
+const fs = require('fs');
+const path = require('path');
 
-app.use(express.static('public'));
+const images_dir = './public/images/cards';
+const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).map(file => `${images_dir}/${file}`);
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 const data = {};
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  socket.emit('updateRooms', Object.keys(data));
+  socket.emit('readRooms', Object.keys(data));
 
   socket.on('createRoom', (roomId, pseudo) => {
     console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId}`);
@@ -23,10 +28,11 @@ io.on('connection', (socket) => {
           [pseudo]: {
               'score': 0
           }
-      }
+      },
+      images: images
     }
 
-    io.emit('updateRooms', Object.keys(data));
+    io.emit('readRooms', Object.keys(data));
     console.log(`List of rooms ${Object.keys(data)}`);
   });
 
@@ -69,17 +75,25 @@ io.on('connection', (socket) => {
 });
 
 const clock = setInterval(function(){
-  let i = 0
   for (const roomId in data) {
-    console.log(`${roomId} ${i}`);
     if (data[roomId]['has_started']) {
       data[roomId]['timer']--;
       if (data[roomId]['timer'] <= 0) {
+        console.log(`New round in room ${roomId}.`)
+        // Get a random image path from the list of image paths
+        const room_images = data[roomId]['images']
+        const random_image = room_images[Math.floor(Math.random() * room_images.length)];
+
+        // Remove the image from the list
+        data[roomId]['images']= data[roomId]['images'].filter(img => img != random_image)
+        
+        // Emit the random image path to all clients in the room
+        io.in(roomId).emit('showImage', random_image);
+
         data[roomId]['timer'] = 30
       }
       io.in(roomId).emit('timer', data[roomId]['timer']);
     }
-    i++;
   }
 }, 1000);
 
