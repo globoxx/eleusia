@@ -2,6 +2,25 @@
 <html>
   <head>
     <title>Time to play !></span></title>
+
+    <style>
+      .image-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        width: 600px;
+        height: 200px;
+        margin: 0 auto;
+      }
+
+      .image-container img {
+        width: 30%;
+        height: auto;
+        margin: 10px;
+        border: 1px solid black;
+      }
+    </style>
   </head>
   <body>
     <h1>Room <span id="room"></span></h1>
@@ -27,7 +46,14 @@
       <button id="start-button" style="display: none;">Start game</button>
     </div>
 
-    <div id="image-container"></div>
+    <div id="image"></div>
+
+    <button id="button-refuser" onclick="vote('refuse')" disabled>Refuser</button>
+    <button id="button-accepter" onclick="vote('accept')"  disabled>Accepter</button>
+
+    <div class="image-container" id="refused-container"></div>
+
+    <div class="image-container" id="accepted-container"></div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -35,8 +61,7 @@
       const url_search_params = new URLSearchParams(window.location.search);
       const roomId = url_search_params.get('room');
       const pseudo = url_search_params.get('pseudo');
-      let score = 0;
-      let timer = 30;
+      let current_image = null;
 
       socket.emit('joinRoom', roomId, pseudo);
 
@@ -52,6 +77,20 @@
           let score_cell = row.insertCell(1);
           score_cell.innerHTML = user_data['score'];
         };
+      }
+
+      function vote(decision) {
+        socket.emit('vote', roomId, pseudo, decision);
+        const button_refuser = document.getElementById("button-refuser");
+        const button_accepter = document.getElementById("button-accepter");
+        button_refuser.disabled = true;
+        button_accepter.disabled = true;
+
+        const imageContainer = document.getElementById('image');
+        imageContainer.innerHTML = '';
+
+        const container = decision === 'refuse' ? document.getElementById('refused-container') : document.getElementById('accepted-container');
+        imageContainer.appendChild(current_image);
       }
 
       socket.on('roomJoined', (data) => {
@@ -83,11 +122,18 @@
         // Create a new image element
         const image = new Image();
         image.src = image_path;
+        image.width = 100;
+        current_image = image;
 
         // Add the image to the page
-        const imageContainer = document.getElementById('image-container');
+        const imageContainer = document.getElementById('image');
         imageContainer.innerHTML = '';
         imageContainer.appendChild(image);
+
+        const button_refuser = document.getElementById("button-refuser");
+        const button_accepter = document.getElementById("button-accepter");
+        button_refuser.disabled = false;
+        button_accepter.disabled = false;
       });
 
       document.getElementById('button').addEventListener('click', () => {

@@ -5,8 +5,8 @@ const io = require('socket.io')(http);
 const fs = require('fs');
 const path = require('path');
 
-const images_dir = './public/images/cards';
-const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).map(file => `${images_dir}/${file}`);
+const images_dir = '/images/cards';
+const images = fs.readdirSync('./public' + images_dir).filter(file => file.endsWith('.png')).map(file => `${images_dir}/${file}`);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -23,7 +23,7 @@ io.on('connection', (socket) => {
       counter: 0,
       creator: pseudo,
       has_started: false,
-      timer: 30,
+      timer: 0,
       users: {
           [pseudo]: {
               'score': 0
@@ -67,6 +67,10 @@ io.on('connection', (socket) => {
     } else {
         console.log(`Game started in room ${roomId} but this room does not exist !`);
     }
+  });
+
+  socket.on('vote', (roomId, pseudo, decision) => {
+
   });
 
   socket.on('disconnect', () => {
