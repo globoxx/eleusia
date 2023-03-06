@@ -15,7 +15,7 @@ const data = {};
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
-  socket.emit('readRooms', Object.keys(data));
+  socket.emit('updateRooms', Object.keys(data));
 
   socket.on('createRoom', (roomId, pseudo) => {
     console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId}`);
@@ -24,15 +24,11 @@ io.on('connection', (socket) => {
       creator: pseudo,
       has_started: false,
       timer: 0,
-      users: {
-          [pseudo]: {
-              'score': 0
-          }
-      },
+      users: {},
       images: images
     }
 
-    io.emit('readRooms', Object.keys(data));
+    io.emit('updateRooms', Object.keys(data));
     console.log(`List of rooms ${Object.keys(data)}`);
   });
 
@@ -40,9 +36,11 @@ io.on('connection', (socket) => {
     if (roomId in data) {
       console.log(`User ${socket.id} with pseudo ${pseudo} joined room ${roomId}`);
       socket.join(roomId);
+      const is_creator = data[roomId]['creator'] === pseudo;
       data[roomId]['users'][pseudo] = {
-        'score': 0
-      }
+        'score': is_creator ? 'Maître du jeu' : 0,
+        'vote': null
+      };
       io.in(roomId).emit('roomJoined', data[roomId]);
     } else {
       console.log('ROOM NOT FOUND');
@@ -53,7 +51,6 @@ io.on('connection', (socket) => {
     console.log(`User ${socket.id} with pseudo ${pseudo} clicked button in room ${roomId}`);
     if (roomId in data) {
         data[roomId]['counter']++;
-        data[roomId]['users'][pseudo]['score']++;
         io.in(roomId).emit(`counter`, data[roomId]);
     } else {
         console.log(`User ${socket.id} with pseudo ${pseudo} clicked button in room ${roomId} but this room does not exist !`);
@@ -70,7 +67,9 @@ io.on('connection', (socket) => {
   });
 
   socket.on('vote', (roomId, pseudo, decision) => {
-
+    console.log(`In room ${roomId}, ${pseudo} voted ${decision}`);
+    data[roomId]['users'][pseudo]['vote'] = decision;
+    io.in(roomId).emit('updateUsers', data[roomId]['users']);
   });
 
   socket.on('disconnect', () => {
@@ -83,6 +82,20 @@ const clock = setInterval(function(){
     if (data[roomId]['has_started']) {
       data[roomId]['timer']--;
       if (data[roomId]['timer'] <= 0) {
+        const creator = data[roomId]['creator'];
+        const vote_of_creator = data[roomId]['users'][creator]['vote'];
+        if (vote_of_creator == null) {
+          console.log('BIG ISSUE, CREATOR VOTE IS NULL');
+        }
+        for (const user_pseudo of Object.keys(data[roomId]['users'])) {
+          if (user_pseudo != creator) {
+            const user_vote = data[roomId]['users'][user_pseudo]['vote'];
+            if (user_vote === vote_of_creator) {
+              data[roomId]['users'][user_pseudo]['score']++;
+            }
+          }
+        }
+        // -----------------------------------------------------
         console.log(`New round in room ${roomId}.`)
         // Get a random image path from the list of image paths
         const room_images = data[roomId]['images']
@@ -90,11 +103,17 @@ const clock = setInterval(function(){
 
         // Remove the image from the list
         data[roomId]['images']= data[roomId]['images'].filter(img => img != random_image)
-        
+
         // Emit the random image path to all clients in the room
         io.in(roomId).emit('showImage', random_image);
 
-        data[roomId]['timer'] = 30
+        // Reset votes and update users
+        for (const user_pseudo of Object.keys(data[roomId]['users'])) {
+          data[roomId]['users'][user_pseudo]['vote'] = null;
+        }
+        io.in(roomId).emit('updateUsers', data[roomId]['users']);
+
+        data[roomId]['timer'] = 5
       }
       io.in(roomId).emit('timer', data[roomId]['timer']);
     }

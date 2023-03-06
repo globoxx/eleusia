@@ -21,7 +21,7 @@
       const socket = io();
       let rooms = [];
 
-      socket.on('readRooms', (available_rooms) => {
+      socket.on('updateRooms', (available_rooms) => {
         rooms = available_rooms;
       })
 

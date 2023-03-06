@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Time to play !></span></title>
+    <title>Time to play !</title>
 
     <style>
       .image-container {
@@ -12,13 +12,13 @@
         width: 600px;
         height: 200px;
         margin: 0 auto;
+        border-style: solid;
       }
 
       .image-container img {
-        width: 30%;
+        width: 10%;
         height: auto;
-        margin: 10px;
-        border: 1px solid black;
+        margin: 5px;
       }
     </style>
   </head>
@@ -72,10 +72,17 @@
         table.innerHTML = '';
         for (const [user_pseudo, user_data] of Object.entries(users)) {
           let row = table.insertRow(-1);
+          const user_score = user_data['score'];
+          const user_vote = user_data['vote'];
           let pseudo_cell = row.insertCell(0);
           pseudo_cell.innerHTML = user_pseudo;
           let score_cell = row.insertCell(1);
-          score_cell.innerHTML = user_data['score'];
+          score_cell.innerHTML = user_score;
+          if (user_vote != null) {
+            row.style.backgroundColor = "green";
+          } else {
+            row.style.backgroundColor = "red";
+          }
         };
       }
 
@@ -86,11 +93,11 @@
         button_refuser.disabled = true;
         button_accepter.disabled = true;
 
-        const imageContainer = document.getElementById('image');
-        imageContainer.innerHTML = '';
+        const image_container = document.getElementById('image');
+        image_container.innerHTML = '';
 
-        const container = decision === 'refuse' ? document.getElementById('refused-container') : document.getElementById('accepted-container');
-        imageContainer.appendChild(current_image);
+        const decision_container = decision === 'refuse' ? document.getElementById('refused-container') : document.getElementById('accepted-container');
+        decision_container.appendChild(current_image);
       }
 
       socket.on('roomJoined', (data) => {
@@ -107,11 +114,13 @@
       });
 
       socket.on(`counter`, (data) => {
-        counter = data['counter']
-        score = data['users'][pseudo]['score']
-        loadTableData(data['users']);
+        counter = data['counter'];
         document.getElementById('counter').textContent = counter;
         document.getElementById('score').textContent = score;
+      });
+
+      socket.on('updateUsers', (users) => {
+        loadTableData(users);
       });
 
       socket.on(`timer`, (timer) => {
