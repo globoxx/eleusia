@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails} from '@mui/material';
 import { Socket } from 'socket.io-client';
-import { ServerToClientEvents, ClientToServerEvents } from '../../../server/server';
 
-function Home({socket}: {socket: Socket<ServerToClientEvents, ClientToServerEvents>}) {
-    const [rooms, setRooms] = useState<String>([])
+function Home({socket}: {socket: Socket}) {
+    const [rooms, setRooms] = useState<string>([])
     const [pseudo, setPseudo] = useState('')
     const [room, setRoom] = useState('')
 

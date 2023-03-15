@@ -2,12 +2,11 @@ import Button from '@mui/material/Button';
 import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { Socket } from 'socket.io-client';
-import { ServerToClientEvents, ClientToServerEvents } from '../../../server/server';
 
-function BoardGame({socket, pseudo, room}: {socket: Socket<ServerToClientEvents, ClientToServerEvents>, pseudo: String, room: String}) {
+function BoardGame({socket, pseudo, room}: {socket: Socket, pseudo: string, room: string}) {
 
-    const [counter, setCounter] = useState<Number>(0)
-    const [timer, setTimer] = useState<Number | String>(0)
+    const [counter, setCounter] = useState<number>(0)
+    const [timer, setTimer] = useState<number | string>(0)
 
     const is_creator = pseudo === data['creator']
 
@@ -19,7 +18,7 @@ function BoardGame({socket, pseudo, room}: {socket: Socket<ServerToClientEvents,
 
     }
 
-    const handleVote = (decision: String) => {
+    const handleVote = (decision: string) => {
         socket.emit('vote', room, pseudo, decision);
         
         // Disable voting buttons
@@ -37,7 +36,7 @@ function BoardGame({socket, pseudo, room}: {socket: Socket<ServerToClientEvents,
             loadTableData(data['users']);
         });
     
-        socket.on('counter', (counter: Number) => {
+        socket.on('counter', (counter: number) => {
             setCounter(counter)
         });
 
@@ -45,7 +44,7 @@ function BoardGame({socket, pseudo, room}: {socket: Socket<ServerToClientEvents,
             loadTableData(users);
         });
     
-        socket.on('timer', (timer: Number) => {
+        socket.on('timer', (timer: number) => {
             if (!wait_on_creator) {
                 setTimer(timer)
             } else {
@@ -53,7 +52,7 @@ function BoardGame({socket, pseudo, room}: {socket: Socket<ServerToClientEvents,
             }
         });
     
-        socket.on('newRound', (image_path: String) => {
+        socket.on('newRound', (image_path: string) => {
             // Create a new image element
             const image = new Image();
             image.src = image_path;
@@ -72,11 +71,11 @@ function BoardGame({socket, pseudo, room}: {socket: Socket<ServerToClientEvents,
 
             wait_on_creator = false;
         });
-    
+
         socket.on('waitCreator', () => {
             wait_on_creator = true;
         });
-      },[])
+    },[])
 
     return (
         <>

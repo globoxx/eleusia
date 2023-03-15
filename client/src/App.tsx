@@ -3,9 +3,8 @@ import React, { useState } from 'react'
 import { io, Socket } from "socket.io-client";
 import BoardGame from './components/GameBoard'
 import Home from './components/Home'
-import {ServerToClientEvents, ClientToServerEvents} from '../../server/server'
 
-const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io('http://localhost:5000')
+const socket: Socket = io('http://localhost:5000')
 
 // Making the App component
 function App() {
@@ -21,7 +20,7 @@ function App() {
   return (
     <div>
       {isInGame
-        ? <BoardGame />
+        ? <BoardGame socket={undefined} pseudo={undefined} room={undefined} />
         : <Home socket />
       }
     </div>
