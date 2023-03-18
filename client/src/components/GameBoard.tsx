@@ -1,14 +1,25 @@
 import Button from '@mui/material/Button';
+import Image from 'mui-image'
 import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { Socket } from 'socket.io-client';
+import { RoomData } from '../../../server/server';
+import ImagesContainer from './ImagesContainer';
+import UsersTable from './UsersTable';
 
 function BoardGame({socket, pseudo, room}: {socket: Socket, pseudo: string, room: string}) {
 
+    const [roomData, setRoomData] = useState<RoomData>({})
     const [counter, setCounter] = useState<number>(0)
     const [timer, setTimer] = useState<number | string>(0)
+    const [waitOnCreator, setWaitOnCreator] = useState(false)
+    const [currentImage, setCurrentImage] = useState('')
+    const [votingDisabled, setVotingDisabled] = useState(false)
+    const [acceptedImages, setAcceptedImages] = useState<string[]>([])
+    const [refusedImages, setRefusedImages] = useState<string[]>([])
 
-    const is_creator = pseudo === data['creator']
+    const isRoomCreator = pseudo === roomData.creator
+    const message = isRoomCreator ? "Bienvenue Ô créateur" : "Hey t'es un simple joueur"
 
     const handleClickIncreaseCounter = () => {
 
@@ -21,86 +32,79 @@ function BoardGame({socket, pseudo, room}: {socket: Socket, pseudo: string, room
     const handleVote = (decision: string) => {
         socket.emit('vote', room, pseudo, decision);
         
-        // Disable voting buttons
+        setVotingDisabled(true)
 
-        // Remove main image
+        if (decision === "Accept") {
+            setAcceptedImages([...acceptedImages, currentImage])
+        } else {
+            setRefusedImages([...refusedImages, currentImage])
+        }
 
-        // Add image to category
+        setCurrentImage('')
     }
 
     const handleClickRefuse = () => handleVote('Refuse')
     const handleClickAccept = () => handleVote('Accept')
 
     useEffect(()=>{
-        socket.on('roomJoined', (data) => {
-            loadTableData(data['users']);
-        });
-    
         socket.on('counter', (counter: number) => {
             setCounter(counter)
         });
 
-        socket.on('updateUsers', (users) => {
-            loadTableData(users);
+        socket.on('updateData', (data: RoomData) => {
+            setRoomData(data)
         });
     
         socket.on('timer', (timer: number) => {
-            if (!wait_on_creator) {
+            if (!waitOnCreator) {
                 setTimer(timer)
             } else {
                 setTimer("LE MAÎTRE DU JEU DOIT JOUER")
             }
         });
     
-        socket.on('newRound', (image_path: string) => {
-            // Create a new image element
-            const image = new Image();
-            image.src = image_path;
-            image.width = 100;
-            current_image = image;
+        socket.on('newRound', (image: string) => {
+            setCurrentImage(image)
 
-            // Add the image to the page
-            const imageContainer = document.getElementById('image');
-            imageContainer.innerHTML = '';
-            imageContainer.appendChild(image);
+            setVotingDisabled(false)
 
-            const button_refuser = document.getElementById("button-refuser");
-            const button_accepter = document.getElementById("button-accepter");
-            button_refuser.disabled = false;
-            button_accepter.disabled = false;
-
-            wait_on_creator = false;
+            setWaitOnCreator(false)
         });
 
         socket.on('waitCreator', () => {
-            wait_on_creator = true;
+            setWaitOnCreator(true)
         });
-    },[])
+    },[socket, waitOnCreator])
 
     return (
         <>
         <h1>Room {room}</h1>
         <p>Counter: {counter}</p>
-        <p>Score: {score}</p> 
+        <p>Score: {roomData.users[pseudo].score}</p> 
         <Button variant="contained" onClick={handleClickIncreaseCounter}>Increase counter</Button>
         <p>{message}</p>
 
         <p>Timer: {timer}</p>
 
-        {is_creator ?
+        {isRoomCreator ?
             <Button variant="contained" onClick={handleClickStartGame}>Start game</Button>
             : null
         }
 
-        <Button variant="contained" onClick={handleClickRefuse}>Refuser</Button>
-        <Button variant="contained" onClick={handleClickAccept}>Accepter</Button>
+        <UsersTable users={roomData.users} />
 
-        <div class="image-container" id="refused-container"></div>
+        {currentImage ? <Image src={currentImage} width={500} /> : null}
 
-        <div class="image-container" id="accepted-container"></div>
+        <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>Refuser</Button>
+        <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>Accepter</Button>
+
+        
+        <ImagesContainer images={acceptedImages} category={"Accepté"}/>
+
+        <ImagesContainer images={refusedImages} category={"Accepté"}/>
 
         </>
-    );
+    )
 }
 
 export default BoardGame;

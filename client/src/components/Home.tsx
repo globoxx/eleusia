@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails} from '@mui/material';
 import { Socket } from 'socket.io-client';
 
-function Home({socket}: {socket: Socket}) {
-    const [rooms, setRooms] = useState<string>([])
+function Home({socket, callbackPseudoChange, callbackRoomChange}: {socket: Socket, callbackPseudoChange: (e: React.ChangeEvent<HTMLInputElement>) => void, callbackRoomChange: (e: React.ChangeEvent<HTMLInputElement>) => void}) {
+    const [rooms, setRooms] = useState<string[]>([])
     const [pseudo, setPseudo] = useState('')
     const [room, setRoom] = useState('')
 
-    const handlePseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {setPseudo(e.target.value)}
-    const handleRoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {setRoom(e.target.value)}
+    const handlePseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        callbackPseudoChange(e)
+        setPseudo(e.target.value)
+    }
+    const handleRoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        callbackRoomChange(e)
+        setRoom(e.target.value)
+    }
 
     const handleClickJoinRoom = () => {
         if (pseudo && room) {
@@ -32,6 +38,12 @@ function Home({socket}: {socket: Socket}) {
           alert('Please enter a pseudo to create a room.');
         }
     }
+
+    useEffect(()=>{
+        socket.on('updateRooms', (rooms: string[]) => {
+            setRooms(rooms)
+        });
+    },[socket])
     
     return (
     <Grid container justifyContent="space-evenly" alignItems="center">

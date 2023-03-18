@@ -16,12 +16,17 @@ function App() {
   },[])
 
   const [isInGame, setIsInGame] = useState(false)
+  const [pseudo, setPseudo] = useState('')
+  const [room, setRoom] = useState('')
+
+  const callbackPseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {setPseudo(e.target.value)}
+  const callbackRoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {setRoom(e.target.value)}
 
   return (
     <div>
       {isInGame
-        ? <BoardGame socket={undefined} pseudo={undefined} room={undefined} />
-        : <Home socket />
+        ? <BoardGame socket={socket} pseudo={pseudo} room={room} />
+        : <Home socket={socket} callbackPseudoChange={callbackPseudoChange} callbackRoomChange={callbackRoomChange} />
       }
     </div>
   )
