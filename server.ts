@@ -135,7 +135,7 @@ function start_new_round(roomId: string) {
   for (const user_pseudo of Object.keys(data[roomId].users)) {
     data[roomId].users[user_pseudo].vote = null
   }
-  io.in(roomId).emit('updateUsers', data[roomId].users)
+  io.in(roomId).emit('updateData', data[roomId])
 
   data[roomId].timer = round_duration
 }
