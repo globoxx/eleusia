@@ -1,8 +1,7 @@
-import cors from "cors"
-import express from "express"
+import * as express from 'express'
 import { createServer } from "http"
 import { Server, Socket } from "socket.io"
-import fs from "fs"
+import * as fs from 'fs'
 
 const app = express()
 const httpServer = createServer(app)
@@ -13,7 +12,6 @@ const io = new Server(httpServer, {})
 const port = 5000
 const path = __dirname + '/build/'
 
-app.use(cors())
 app.use(express.static(path));
 
 app.get('/', function(_req, res) {
