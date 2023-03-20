@@ -2,6 +2,7 @@ import express = require('express')
 import { createServer } from "http"
 import { Server, Socket } from "socket.io"
 import * as fs from 'fs'
+import * as path from "path"
 
 const app = express()
 const httpServer = createServer(app)
@@ -10,13 +11,13 @@ const io = new Server(httpServer)
 
 // our localhost port
 const port = 5000
-const path = __dirname + '/build/'
+const build_path = path.join(__dirname, 'build')
 
-app.use(express.static(path));
+app.use(express.static(build_path))
 
 app.get('/', function(_req, res) {
-  res.sendFile(path + "index.html");
-});
+  res.sendFile(path.join(build_path, 'index.html'))
+})
 
 export interface User {
   score: number,
@@ -40,8 +41,8 @@ export interface Data {
   [roomId: string]: RoomData
 }
 
-const images_dir = 'build/images/cards'
-const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).map(file => `${images_dir}/${file}`)
+const images_dir = path.join(build_path, 'images', 'cards')
+const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).map(file => path.join(images_dir, file))
 const round_duration = 10
 const data: Data = {}
 

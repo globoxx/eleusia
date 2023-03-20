@@ -4,18 +4,19 @@ var express = require("express");
 var http_1 = require("http");
 var socket_io_1 = require("socket.io");
 var fs = require("fs");
+var path = require("path");
 var app = express();
 var httpServer = (0, http_1.createServer)(app);
 var io = new socket_io_1.Server(httpServer);
 // our localhost port
 var port = 5000;
-var path = __dirname + '/build/';
-app.use(express.static(path));
+var build_path = path.join(__dirname, 'build');
+app.use(express.static(build_path));
 app.get('/', function (_req, res) {
-    res.sendFile(path + "index.html");
+    res.sendFile(path.join(build_path, 'index.html'));
 });
-var images_dir = 'build/images/cards';
-var images = fs.readdirSync(images_dir).filter(function (file) { return file.endsWith('.png'); }).map(function (file) { return "".concat(images_dir, "/").concat(file); });
+var images_dir = path.join(build_path, 'images', 'cards');
+var images = fs.readdirSync(images_dir).filter(function (file) { return file.endsWith('.png'); }).map(function (file) { return path.join(images_dir, file); });
 var round_duration = 10;
 var data = {};
 // This is what the socket.io syntax is like, we will work this later
