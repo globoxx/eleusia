@@ -1,3 +1,4 @@
+import { Grid } from '@mui/material';
 import Button from '@mui/material/Button';
 import Image from 'mui-image'
 import React, { useState } from 'react';
@@ -18,7 +19,6 @@ function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room
     const [refusedImages, setRefusedImages] = useState<string[]>([])
 
     const isRoomCreator = roomData ? pseudo === roomData.creator : false
-    const message = isRoomCreator ? "Bienvenue Ô créateur" : "Hey t'es un simple joueur"
 
     const handleClickStartGame = () => {
         socket.emit('startGame', room)
@@ -68,30 +68,41 @@ function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room
     },[socket, waitOnCreator])
 
     return (
-        <>
-        <h1>Room {room}</h1>
-        <p>Score: {roomData ? roomData.users[pseudo].score : 0}</p> 
-        <p>{message}</p>
-
-        <p>Timer: {timer}</p>
-
-        {isRoomCreator && roomData && !roomData.has_started ?
-            <Button variant="contained" onClick={handleClickStartGame}>Start game</Button>
-            : null
-        }
-
-        {roomData ? <UsersTable users={roomData.users} /> : null}
-        
-        {currentImage ? <Image src={currentImage} width={500} /> : null}
-
-        <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>Refuser</Button>
-        <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>Accepter</Button>
-        
-        <ImagesContainer images={acceptedImages} category={"Accepté"}/>
-
-        <ImagesContainer images={refusedImages} category={"Accepté"}/>
-
-        </>
+        <Grid container justifyContent="space-evenly" alignItems="center">
+            <Grid item textAlign="center" xs={12}>
+                <h1>Room {room}</h1>
+            </Grid>
+            <Grid item textAlign="center" xs={12}>
+                <h2>Score: {roomData ? roomData.users[pseudo].score : 0}</h2>
+                <h2>Timer: {timer}</h2>
+                {isRoomCreator && roomData && !roomData.has_started ?
+                    <Button variant="contained" onClick={handleClickStartGame}>Commencer le jeu</Button>
+                    : null
+                }
+            </Grid>
+            <Grid container item textAlign="center" xs={8}>
+                <Grid container item justifyContent="space-evenly" alignItems="center">
+                    <Grid item textAlign="center" xs={6}>
+                        <ImagesContainer images={acceptedImages} category={"Accepté"}/>
+                    </Grid>
+                    <Grid item textAlign="center" xs={6}>
+                        <ImagesContainer images={refusedImages} category={"Refusé"}/>
+                    </Grid>
+                </Grid>
+                <Grid item textAlign="center" xs={12}>
+                    {currentImage ? <Image src={currentImage} width={500} /> : null}
+                </Grid>
+                <Grid item textAlign="center" xs={6}>
+                    <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>Refuser</Button>
+                </Grid>
+                <Grid item textAlign="center" xs={6}>
+                    <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>Accepter</Button>
+                </Grid>
+            </Grid>
+            <Grid item textAlign="center" xs={4}>
+                {roomData ? <UsersTable users={roomData.users} /> : null}
+            </Grid>
+        </ Grid>
     )
 }
 
