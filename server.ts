@@ -13,8 +13,14 @@ const io = new Server(httpServer)
 const port = 5000
 const build_path = path.join(__dirname, 'build')
 
+const images_dir = path.join(build_path, 'images', 'cards')
+const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).map(file => path.join('images', 'cards', file))
+const round_duration = 10
+const data: Data = {}
+
 app.use(cors())
 app.use(express.static(build_path))
+app.use('/images', express.static(images_dir))
 
 app.get('/', function(_req, res) {
   res.sendFile(path.join(build_path, 'index.html'))
@@ -41,11 +47,6 @@ export interface RoomData {
 export interface Data {
   [roomId: string]: RoomData
 }
-
-const images_dir = path.join(build_path, 'images', 'cards')
-const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).map(file => path.join(images_dir, file))
-const round_duration = 10
-const data: Data = {}
 
 io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.id}`)

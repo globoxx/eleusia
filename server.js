@@ -11,15 +11,16 @@ var httpServer = (0, http_1.createServer)(app);
 var io = new socket_io_1.Server(httpServer);
 var port = 5000;
 var build_path = path.join(__dirname, 'build');
+var images_dir = path.join(build_path, 'images', 'cards');
+var images = fs.readdirSync(images_dir).filter(function (file) { return file.endsWith('.png'); }).map(function (file) { return path.join('images', 'cards', file); });
+var round_duration = 10;
+var data = {};
 app.use(cors());
 app.use(express.static(build_path));
+app.use('/images', express.static(images_dir));
 app.get('/', function (_req, res) {
     res.sendFile(path.join(build_path, 'index.html'));
 });
-var images_dir = path.join(build_path, 'images', 'cards');
-var images = fs.readdirSync(images_dir).filter(function (file) { return file.endsWith('.png'); }).map(function (file) { return path.join(images_dir, file); });
-var round_duration = 10;
-var data = {};
 io.on('connection', function (socket) {
     console.log("User connected: ".concat(socket.id));
     socket.emit("updateRooms", Object.keys(data));
