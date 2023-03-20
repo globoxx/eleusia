@@ -46,7 +46,6 @@ const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).
 const round_duration = 10
 const data: Data = {}
 
-// This is what the socket.io syntax is like, we will work this later
 io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.id}`)
 

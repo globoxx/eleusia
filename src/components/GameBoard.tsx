@@ -10,7 +10,6 @@ import UsersTable from './UsersTable';
 function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room: string}) {
 
     const [roomData, setRoomData] = useState<RoomData>()
-    const [counter, setCounter] = useState<number>(0)
     const [timer, setTimer] = useState<number | string>(0)
     const [waitOnCreator, setWaitOnCreator] = useState(false)
     const [currentImage, setCurrentImage] = useState('')
@@ -20,10 +19,6 @@ function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room
 
     const isRoomCreator = roomData ? pseudo === roomData.creator : false
     const message = isRoomCreator ? "Bienvenue Ô créateur" : "Hey t'es un simple joueur"
-
-    const handleClickIncreaseCounter = () => {
-
-    }
 
     const handleClickStartGame = () => {
         socket.emit('startGame', room)
@@ -47,10 +42,6 @@ function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room
     const handleClickAccept = () => handleVote('Accept')
 
     useEffect(()=>{
-        socket.on('counter', (counter: number) => {
-            setCounter(counter)
-        });
-
         socket.on('updateData', (data: RoomData) => {
             setRoomData(data)
         });
@@ -79,9 +70,7 @@ function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room
     return (
         <>
         <h1>Room {room}</h1>
-        <p>Counter: {counter}</p>
         <p>Score: {roomData ? roomData.users[pseudo].score : 0}</p> 
-        <Button variant="contained" onClick={handleClickIncreaseCounter}>Increase counter</Button>
         <p>{message}</p>
 
         <p>Timer: {timer}</p>

@@ -19,7 +19,6 @@ var images_dir = path.join(build_path, 'images', 'cards');
 var images = fs.readdirSync(images_dir).filter(function (file) { return file.endsWith('.png'); }).map(function (file) { return path.join(images_dir, file); });
 var round_duration = 10;
 var data = {};
-// This is what the socket.io syntax is like, we will work this later
 io.on('connection', function (socket) {
     console.log("User connected: ".concat(socket.id));
     socket.emit("updateRooms", Object.keys(data));
