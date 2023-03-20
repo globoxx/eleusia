@@ -100,7 +100,7 @@ function start_new_round(roomId) {
         var user_pseudo = _a[_i];
         data[roomId].users[user_pseudo].vote = null;
     }
-    io.in(roomId).emit('updateUsers', data[roomId].users);
+    io.in(roomId).emit('updateData', data[roomId]);
     data[roomId].timer = round_duration;
 }
 setInterval(function () {
