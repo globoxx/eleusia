@@ -1,4 +1,5 @@
 import express = require('express')
+import cors = require('cors')
 import { createServer } from "http"
 import { Server, Socket } from "socket.io"
 import * as fs from 'fs'
@@ -9,10 +10,10 @@ const httpServer = createServer(app)
 
 const io = new Server(httpServer)
 
-// our localhost port
 const port = 5000
 const build_path = path.join(__dirname, 'build')
 
+app.use(cors())
 app.use(express.static(build_path))
 
 app.get('/', function(_req, res) {

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 var express = require("express");
+var cors = require("cors");
 var http_1 = require("http");
 var socket_io_1 = require("socket.io");
 var fs = require("fs");
@@ -8,9 +9,9 @@ var path = require("path");
 var app = express();
 var httpServer = (0, http_1.createServer)(app);
 var io = new socket_io_1.Server(httpServer);
-// our localhost port
 var port = 5000;
 var build_path = path.join(__dirname, 'build');
+app.use(cors());
 app.use(express.static(build_path));
 app.get('/', function (_req, res) {
     res.sendFile(path.join(build_path, 'index.html'));
