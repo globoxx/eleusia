@@ -6,7 +6,7 @@ var socket_io_1 = require("socket.io");
 var fs = require("fs");
 var app = express();
 var httpServer = (0, http_1.createServer)(app);
-var io = new socket_io_1.Server(httpServer, {});
+var io = new socket_io_1.Server(httpServer);
 // our localhost port
 var port = 5000;
 var path = __dirname + '/build/';
@@ -41,7 +41,7 @@ io.on('connection', function (socket) {
         socket.join(roomId);
         io.in(roomId).emit('updateData', data[roomId]);
         io.emit('updateRooms', Object.keys(data));
-        console.log("List of rooms ".concat(Object.keys(data)));
+        console.log("List of rooms ".concat(Object.keys(data).toString()));
     });
     socket.on('joinRoom', function (roomId, pseudo) {
         if (roomId in data) {
@@ -132,4 +132,4 @@ setInterval(function () {
         }
     }
 }, 1000);
-httpServer.listen(port, function () { return console.log("Listening on port ".concat(port)); });
+httpServer.listen(port, function () { return console.log("Listening on port ".concat(port.toString())); });

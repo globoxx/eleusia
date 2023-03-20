@@ -1,4 +1,4 @@
-import * as express from 'express'
+import express = require('express')
 import { createServer } from "http"
 import { Server, Socket } from "socket.io"
 import * as fs from 'fs'
@@ -6,7 +6,7 @@ import * as fs from 'fs'
 const app = express()
 const httpServer = createServer(app)
 
-const io = new Server(httpServer, {})
+const io = new Server(httpServer)
 
 // our localhost port
 const port = 5000
@@ -71,7 +71,7 @@ io.on('connection', (socket: Socket) => {
     io.in(roomId).emit('updateData', data[roomId])
 
     io.emit('updateRooms', Object.keys(data))
-    console.log(`List of rooms ${Object.keys(data)}`)
+    console.log(`List of rooms ${Object.keys(data).toString()}`)
   })
 
   socket.on('joinRoom', (roomId: string, pseudo: string) => {
@@ -168,4 +168,4 @@ setInterval(function(){
   }
 }, 1000)
 
-httpServer.listen(port, () => console.log(`Listening on port ${port}`))
+httpServer.listen(port, () => console.log(`Listening on port ${port.toString()}`))
