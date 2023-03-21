@@ -79,9 +79,9 @@ io.on('connection', function (socket) {
             console.log("Game started in room ".concat(roomId, " but this room does not exist !"));
         }
     });
-    socket.on('vote', function (roomId, pseudo, decision) {
-        console.log("In room ".concat(roomId, ", ").concat(pseudo, " voted ").concat(decision));
-        data[roomId].users[pseudo].vote = decision;
+    socket.on('vote', function (roomId, pseudo, vote) {
+        console.log("In room ".concat(roomId, ", ").concat(pseudo, " voted ").concat(vote));
+        data[roomId].users[pseudo].vote = vote;
         io.in(roomId).emit('updateData', data[roomId]);
     });
     socket.on('disconnect', function () {
@@ -106,20 +106,20 @@ function start_new_round(roomId) {
     data[roomId].timer = round_duration;
 }
 setInterval(function () {
+    var _a;
     for (var roomId in data) {
         if (data[roomId].has_started) {
             data[roomId].timer--;
             if (data[roomId].timer <= 0) {
                 var creator = data[roomId].creator;
-                var vote_of_creator = data[roomId].users[creator].vote;
-                if (vote_of_creator != null) {
-                    for (var _i = 0, _a = Object.keys(data[roomId].users); _i < _a.length; _i++) {
-                        var user_pseudo = _a[_i];
-                        if (user_pseudo !== creator) {
-                            var user_vote = data[roomId].users[user_pseudo].vote;
-                            if (user_vote === vote_of_creator) {
-                                data[roomId].users[user_pseudo].score++;
-                            }
+                var creatorVote = data[roomId].users[creator].vote;
+                if (creatorVote != null) {
+                    for (var _i = 0, _b = Object.keys(data[roomId].users); _i < _b.length; _i++) {
+                        var userPseudo = _b[_i];
+                        if (userPseudo !== creator) {
+                            var userVote = (_a = data[roomId].users[userPseudo].vote) !== null && _a !== void 0 ? _a : 0;
+                            var score = 1 - Math.abs(creatorVote - userVote);
+                            data[roomId].users[userPseudo].score += score;
                         }
                     }
                     // -----------------------------------------------------

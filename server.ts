@@ -28,7 +28,7 @@ app.get('/', function(_req, res) {
 
 export interface User {
   score: number,
-  vote: string | null
+  vote: number | null
 }
 
 export interface Users {
@@ -110,9 +110,9 @@ io.on('connection', (socket: Socket) => {
     }
   })
 
-  socket.on('vote', (roomId: string, pseudo: string, decision: string) => {
-    console.log(`In room ${roomId}, ${pseudo} voted ${decision}`)
-    data[roomId].users[pseudo].vote = decision
+  socket.on('vote', (roomId: string, pseudo: string, vote: number) => {
+    console.log(`In room ${roomId}, ${pseudo} voted ${vote}`)
+    data[roomId].users[pseudo].vote = vote
     io.in(roomId).emit('updateData', data[roomId])
   })
 
@@ -148,14 +148,13 @@ setInterval(function(){
       data[roomId].timer--
       if (data[roomId].timer <= 0) {
         const creator = data[roomId].creator
-        const vote_of_creator = data[roomId].users[creator].vote
-        if (vote_of_creator != null) {
-          for (const user_pseudo of Object.keys(data[roomId].users)) {
-            if (user_pseudo !== creator) {
-              const user_vote = data[roomId].users[user_pseudo].vote
-              if (user_vote === vote_of_creator) {
-                data[roomId].users[user_pseudo].score++
-              }
+        const creatorVote = data[roomId].users[creator].vote
+        if (creatorVote != null) {
+          for (const userPseudo of Object.keys(data[roomId].users)) {
+            if (userPseudo !== creator) {
+              const userVote = data[roomId].users[userPseudo].vote ?? 0
+              const score = 1 - Math.abs(creatorVote - userVote)
+              data[roomId].users[userPseudo].score += score
             }
           }
           // -----------------------------------------------------

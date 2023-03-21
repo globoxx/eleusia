@@ -11,7 +11,7 @@ import { Users, User } from '../../server';
 function UsersTable({users}: {users: Users}) {
     return (
         <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 650 }} aria-label="simple table">
+        <Table aria-label="simple table">
             <TableHead>
             <TableRow>
                 <TableCell>Joueur</TableCell>
@@ -23,7 +23,7 @@ function UsersTable({users}: {users: Users}) {
             {Object.entries(users).map(([pseudo, user]: [string, User]) => (
                 <TableRow
                 key={pseudo}
-                sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                sx={{ '&:last-child td, &:last-child th': { border: 0, color: (user.vote ? 'green' : 'red') } }}
                 >
                 <TableCell component="th" scope="row">
                     {pseudo}

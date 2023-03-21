@@ -1,4 +1,4 @@
-import { Grid } from '@mui/material';
+import { Box, Grid, Slider } from '@mui/material';
 import Button from '@mui/material/Button';
 import Image from 'mui-image'
 import React, { useState } from 'react';
@@ -17,6 +17,7 @@ function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room
     const [votingDisabled, setVotingDisabled] = useState(true)
     const [acceptedImages, setAcceptedImages] = useState<string[]>([])
     const [refusedImages, setRefusedImages] = useState<string[]>([])
+    const [vote, setVote] = useState<number>(0)
 
     const isRoomCreator = roomData ? pseudo === roomData.creator : false
 
@@ -24,12 +25,16 @@ function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room
         socket.emit('startGame', room)
     }
 
-    const handleVote = (decision: string) => {
-        socket.emit('vote', room, pseudo, decision);
+    const handleDecisionChange = (_event: any, newValue: number | number[]) => {
+        setVote(newValue as number)
+    }
+
+    const handleClickVote = () => {
+        socket.emit('vote', room, pseudo, vote);
         
         setVotingDisabled(true)
 
-        if (decision === "Accept") {
+        if (vote > 0) {
             setAcceptedImages([...acceptedImages, currentImage])
         } else {
             setRefusedImages([...refusedImages, currentImage])
@@ -37,9 +42,6 @@ function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room
 
         setCurrentImage('')
     }
-
-    const handleClickRefuse = () => handleVote('Refuse')
-    const handleClickAccept = () => handleVote('Accept')
 
     useEffect(()=>{
         socket.on('updateData', (data: RoomData) => {
@@ -83,24 +85,32 @@ function GameBoard({socket, pseudo, room}: {socket: Socket, pseudo: string, room
             <Grid container item textAlign="center" xs={8}>
                 <Grid container item justifyContent="space-evenly" alignItems="center">
                     <Grid item textAlign="center" xs={6}>
-                        <ImagesContainer images={acceptedImages} category={"Accepté"}/>
+                        <Box sx={{ border: 1 }}>
+                            <ImagesContainer images={refusedImages} category={"Refusé"}/>
+                        </Box>
                     </Grid>
                     <Grid item textAlign="center" xs={6}>
-                        <ImagesContainer images={refusedImages} category={"Refusé"}/>
+                        <Box sx={{ border: 1 }}>
+                            <ImagesContainer images={acceptedImages} category={"Accepté"}/>
+                        </Box>
                     </Grid>
                 </Grid>
-                <Grid item textAlign="center" xs={12}>
-                    {currentImage ? <Image src={currentImage} width={500} /> : null}
+                <Grid item textAlign="center" justifyContent="center" xs={12}>
+                    <Box sx={{ width: 200 }}>
+                        {currentImage ? <Image src={currentImage} width={200} /> : null}
+                    </Box>
                 </Grid>
-                <Grid item textAlign="center" xs={6}>
-                    <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>Refuser</Button>
+                <Grid item textAlign="center" xs={10}>
+                    <Slider defaultValue={0} aria-label="Default" valueLabelDisplay="auto" onChange={handleDecisionChange} />
                 </Grid>
-                <Grid item textAlign="center" xs={6}>
-                    <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>Accepter</Button>
+                <Grid item textAlign="center" xs={10}>
+                    <Button variant="contained" onClick={handleClickVote} disabled={votingDisabled}>Confirmer</Button>
                 </Grid>
             </Grid>
-            <Grid item textAlign="center" xs={4}>
-                {roomData ? <UsersTable users={roomData.users} /> : null}
+            <Grid item textAlign="start" xs={4}>
+                <Box sx={{ border: 1, m: 5 }}>
+                    {roomData ? <UsersTable users={roomData.users} /> : null}
+                </Box>
             </Grid>
         </ Grid>
     )
