@@ -16,7 +16,6 @@ function UsersTable({users}: {users: Users}) {
             <TableRow>
                 <TableCell>Joueur</TableCell>
                 <TableCell align="right">Score</TableCell>
-                <TableCell align="right">Vote</TableCell>
             </TableRow>
             </TableHead>
             <TableBody>
@@ -29,7 +28,6 @@ function UsersTable({users}: {users: Users}) {
                     {pseudo}
                 </TableCell>
                 <TableCell align="right">{user.score}</TableCell>
-                <TableCell align="right">{user.vote}</TableCell>
                 </TableRow>
             ))}
             </TableBody>

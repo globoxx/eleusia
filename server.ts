@@ -4,6 +4,7 @@ import { createServer } from "http"
 import { Server, Socket } from "socket.io"
 import * as fs from 'fs'
 import * as path from "path"
+import sizeOf from 'image-size'
 
 const app = express()
 const httpServer = createServer(app)
@@ -15,6 +16,8 @@ const build_path = path.join(__dirname, 'build')
 
 const images_dir = path.join(build_path, 'images', 'cards')
 const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).map(file => path.join('images', 'cards', file))
+const imageDimensions = sizeOf(path.join(build_path, images[0]))
+const imageSize = {width: imageDimensions.width ?? 100, height: imageDimensions.height ?? 100}
 const round_duration = 10
 const data: Data = {}
 
@@ -41,6 +44,7 @@ export interface RoomData {
   has_started: boolean,
   timer: number,
   images: string[]
+  imageSize: {width: number, height: number},
   users: Users
 }
 
@@ -51,7 +55,7 @@ export interface Data {
 io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.id}`)
 
-  socket.emit("updateRooms", Object.keys(data))
+  socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.has_started))))
 
   socket.on('createRoom', (roomId: string, pseudo: string) => {
     console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId}`)
@@ -61,6 +65,7 @@ io.on('connection', (socket: Socket) => {
       has_started: false,
       timer: round_duration,
       images: images,
+      imageSize: imageSize,
       users: {
         [pseudo]: {
           score: 0,
@@ -70,9 +75,10 @@ io.on('connection', (socket: Socket) => {
     }
 
     socket.join(roomId)
-    io.in(roomId).emit('updateData', data[roomId])
 
-    io.emit('updateRooms', Object.keys(data))
+    io.in(roomId).emit('updateRoomData', data[roomId])
+
+    io.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.has_started))))
     console.log(`List of rooms ${Object.keys(data).toString()}`)
   })
 
@@ -84,7 +90,7 @@ io.on('connection', (socket: Socket) => {
         score: 0,
         vote: null
       }
-      io.in(roomId).emit('updateData', data[roomId])
+      io.in(roomId).emit('updateRoomData', data[roomId])
     } else {
       console.log('ROOM NOT FOUND')
     }
@@ -113,7 +119,7 @@ io.on('connection', (socket: Socket) => {
   socket.on('vote', (roomId: string, pseudo: string, vote: number) => {
     console.log(`In room ${roomId}, ${pseudo} voted ${vote}`)
     data[roomId].users[pseudo].vote = vote
-    io.in(roomId).emit('updateData', data[roomId])
+    io.in(roomId).emit('updateRoomData', data[roomId])
   })
 
   socket.on('disconnect', () => {
@@ -137,7 +143,7 @@ function start_new_round(roomId: string) {
   for (const user_pseudo of Object.keys(data[roomId].users)) {
     data[roomId].users[user_pseudo].vote = null
   }
-  io.in(roomId).emit('updateData', data[roomId])
+  io.in(roomId).emit('updateRoomData', data[roomId])
 
   data[roomId].timer = round_duration
 }
@@ -150,13 +156,16 @@ setInterval(function(){
         const creator = data[roomId].creator
         const creatorVote = data[roomId].users[creator].vote
         if (creatorVote != null) {
+          const usersPoints: {[pseudo: string]: number} = {}
           for (const userPseudo of Object.keys(data[roomId].users)) {
             if (userPseudo !== creator) {
               const userVote = data[roomId].users[userPseudo].vote ?? 0
-              const score = 1 - Math.abs(creatorVote - userVote)
-              data[roomId].users[userPseudo].score += score
+              const points = Math.round((1 - Math.abs(creatorVote - userVote)) * 100)
+              data[roomId].users[userPseudo].score += points
+              usersPoints[userPseudo] = points
             }
           }
+          io.in(roomId).emit('points', usersPoints)
           // -----------------------------------------------------
           start_new_round(roomId)
         } else {

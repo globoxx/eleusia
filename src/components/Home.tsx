@@ -19,14 +19,13 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
     const handleClickJoinRoom = () => {
         if (pseudo && room) {
           if (rooms.includes(room)) {
-            // Faire remonter l'info que le user entre dans la partie
             socket.emit('joinRoom', room, pseudo);
             callbackJoinRoom(room)
           } else {
-            alert('The room does not exist.');
+            alert('Cette room n\'existe pas.');
           }
         } else {
-          alert('Please enter a username and room ID to join a room.');
+          alert('Choisissez un pseudo et un numéro de room à rejoindre.');
         }
     }
     const handleClickCreateRoom = () => {
@@ -37,7 +36,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
           socket.emit('createRoom', generated_room, pseudo);
           callbackJoinRoom(generated_room)
         } else {
-          alert('Please enter a pseudo to create a room.');
+          alert('Choisissez un pseudo pour rejoindre une room.');
         }
     }
 
@@ -61,7 +60,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                 <TextField id="outlined-basic" label="Numéro de room" value={room} onChange={handleRoomChange} variant="outlined" />
             </Grid>
             <Grid item>
-                <Button variant="contained" disabled={pseudo.length === 0 || room.length === 0} onClick={handleClickJoinRoom}>Rejoindre room !</Button>
+                <Button variant="contained" disabled={pseudo.length === 0 || room.length === 0} onClick={handleClickJoinRoom}>Rejoindre une room !</Button>
             </Grid>
         </Grid>
         <Grid item textAlign="center" xs={6}>
@@ -70,7 +69,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                     Créer une nouvelle room
                 </AccordionSummary>
                 <AccordionDetails>
-                    <Button variant="contained" disabled={pseudo.length === 0} onClick={handleClickCreateRoom}>Créer room !</Button>
+                    <Button variant="contained" disabled={pseudo.length === 0} onClick={handleClickCreateRoom}>Créer la room !</Button>
                 </AccordionDetails>
             </Accordion>
         </Grid>

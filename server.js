@@ -1,4 +1,5 @@
 "use strict";
+var _a, _b;
 Object.defineProperty(exports, "__esModule", { value: true });
 var express = require("express");
 var cors = require("cors");
@@ -6,6 +7,7 @@ var http_1 = require("http");
 var socket_io_1 = require("socket.io");
 var fs = require("fs");
 var path = require("path");
+var image_size_1 = require("image-size");
 var app = express();
 var httpServer = (0, http_1.createServer)(app);
 var io = new socket_io_1.Server(httpServer);
@@ -13,6 +15,8 @@ var port = 5000;
 var build_path = path.join(__dirname, 'build');
 var images_dir = path.join(build_path, 'images', 'cards');
 var images = fs.readdirSync(images_dir).filter(function (file) { return file.endsWith('.png'); }).map(function (file) { return path.join('images', 'cards', file); });
+var imageDimensions = (0, image_size_1.default)(path.join(build_path, images[0]));
+var imageSize = { width: (_a = imageDimensions.width) !== null && _a !== void 0 ? _a : 100, height: (_b = imageDimensions.height) !== null && _b !== void 0 ? _b : 100 };
 var round_duration = 10;
 var data = {};
 app.use(cors());
@@ -23,7 +27,10 @@ app.get('/', function (_req, res) {
 });
 io.on('connection', function (socket) {
     console.log("User connected: ".concat(socket.id));
-    socket.emit("updateRooms", Object.keys(data));
+    socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(function (_a) {
+        var roomData = _a[1];
+        return !roomData.has_started;
+    }))));
     socket.on('createRoom', function (roomId, pseudo) {
         var _a;
         console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " created new room ").concat(roomId));
@@ -33,6 +40,7 @@ io.on('connection', function (socket) {
             has_started: false,
             timer: round_duration,
             images: images,
+            imageSize: imageSize,
             users: (_a = {},
                 _a[pseudo] = {
                     score: 0,
@@ -41,8 +49,11 @@ io.on('connection', function (socket) {
                 _a)
         };
         socket.join(roomId);
-        io.in(roomId).emit('updateData', data[roomId]);
-        io.emit('updateRooms', Object.keys(data));
+        io.in(roomId).emit('updateRoomData', data[roomId]);
+        io.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(function (_a) {
+            var roomData = _a[1];
+            return !roomData.has_started;
+        }))));
         console.log("List of rooms ".concat(Object.keys(data).toString()));
     });
     socket.on('joinRoom', function (roomId, pseudo) {
@@ -53,7 +64,7 @@ io.on('connection', function (socket) {
                 score: 0,
                 vote: null
             };
-            io.in(roomId).emit('updateData', data[roomId]);
+            io.in(roomId).emit('updateRoomData', data[roomId]);
         }
         else {
             console.log('ROOM NOT FOUND');
@@ -82,7 +93,7 @@ io.on('connection', function (socket) {
     socket.on('vote', function (roomId, pseudo, vote) {
         console.log("In room ".concat(roomId, ", ").concat(pseudo, " voted ").concat(vote));
         data[roomId].users[pseudo].vote = vote;
-        io.in(roomId).emit('updateData', data[roomId]);
+        io.in(roomId).emit('updateRoomData', data[roomId]);
     });
     socket.on('disconnect', function () {
         console.log("User disconnected: ".concat(socket.id));
@@ -102,7 +113,7 @@ function start_new_round(roomId) {
         var user_pseudo = _a[_i];
         data[roomId].users[user_pseudo].vote = null;
     }
-    io.in(roomId).emit('updateData', data[roomId]);
+    io.in(roomId).emit('updateRoomData', data[roomId]);
     data[roomId].timer = round_duration;
 }
 setInterval(function () {
@@ -114,14 +125,17 @@ setInterval(function () {
                 var creator = data[roomId].creator;
                 var creatorVote = data[roomId].users[creator].vote;
                 if (creatorVote != null) {
+                    var usersPoints = {};
                     for (var _i = 0, _b = Object.keys(data[roomId].users); _i < _b.length; _i++) {
                         var userPseudo = _b[_i];
                         if (userPseudo !== creator) {
                             var userVote = (_a = data[roomId].users[userPseudo].vote) !== null && _a !== void 0 ? _a : 0;
-                            var score = 1 - Math.abs(creatorVote - userVote);
-                            data[roomId].users[userPseudo].score += score;
+                            var points = Math.round((1 - Math.abs(creatorVote - userVote)) * 100);
+                            data[roomId].users[userPseudo].score += points;
+                            usersPoints[userPseudo] = points;
                         }
                     }
+                    io.in(roomId).emit('points', usersPoints);
                     // -----------------------------------------------------
                     start_new_round(roomId);
                 }
