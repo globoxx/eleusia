@@ -14,7 +14,6 @@ const style = {
 }
 
 function ScoreModal({points, open, handleClose}: {points: number, open: boolean, handleClose: any}) {
-    const correct = points > 0
     return (
         <Modal
             open={open}
@@ -32,10 +31,10 @@ function ScoreModal({points, open, handleClose}: {points: number, open: boolean,
             <Fade in={open}>
                 <Box sx={style}>
                     <Typography id="modal-modal-title" variant="h6" component="h2">
-                        {correct ? "Bonne décision !" : "Mauvaise décision !"}
+                        {points > 0 ? "Bonne décision !" : (points < 0 ? "Mauvaise décision !" : "Vous êtes indécis...")}
                     </Typography>
-                    <Typography id="modal-modal-description" sx={{ mt: 2, color: correct ? 'green' : 'red' }}>
-                        {correct ? `+${points} points` : `${points} points`}
+                    <Typography id="modal-modal-description" sx={{ mt: 2, color: points > 0 ? 'green' : (points < 0 ? 'red' : 'black')}}>
+                        {points > 0 ? `+${points} points` : `${points} points`}
                     </Typography>
                 </Box>
             </Fade>

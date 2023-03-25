@@ -18,7 +18,6 @@ const images_dir = path.join(build_path, 'images', 'cards')
 const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).map(file => path.join('images', 'cards', file))
 const imageDimensions = sizeOf(path.join(build_path, images[0]))
 const imageSize = {width: imageDimensions.width ?? 100, height: imageDimensions.height ?? 100}
-const round_duration = 10
 const data: Data = {}
 
 app.use(cors())
@@ -39,9 +38,9 @@ export interface Users {
 }
 
 export interface RoomData {
-  counter: number,
+  roundDuration: number,
   creator: string,
-  has_started: boolean,
+  hasStarted: boolean,
   timer: number,
   images: string[]
   imageSize: {width: number, height: number},
@@ -55,15 +54,15 @@ export interface Data {
 io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.id}`)
 
-  socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.has_started))))
+  socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
 
-  socket.on('createRoom', (roomId: string, pseudo: string) => {
+  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number) => {
     console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId}`)
     data[roomId] = {
-      counter: 0,
+      roundDuration: roundDuration,
       creator: pseudo,
-      has_started: false,
-      timer: round_duration,
+      hasStarted: false,
+      timer: roundDuration,
       images: images,
       imageSize: imageSize,
       users: {
@@ -78,7 +77,7 @@ io.on('connection', (socket: Socket) => {
 
     io.in(roomId).emit('updateRoomData', data[roomId])
 
-    io.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.has_started))))
+    io.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
     console.log(`List of rooms ${Object.keys(data).toString()}`)
   })
 
@@ -96,20 +95,10 @@ io.on('connection', (socket: Socket) => {
     }
   })
 
-  socket.on('buttonClick', (roomId: string, pseudo: string) => {
-    console.log(`User ${socket.id} with pseudo ${pseudo} clicked button in room ${roomId}`)
-    if (roomId in data) {
-        data[roomId].counter++
-        io.in(roomId).emit('counter', data[roomId].counter)
-    } else {
-        console.log(`User ${socket.id} with pseudo ${pseudo} clicked button in room ${roomId} but this room does not exist !`)
-    }
-  })
-
   socket.on('startGame', (roomId: string) => {
     console.log(`Game started in room ${roomId}`)
     if (roomId in data) {
-        data[roomId].has_started = true
+        data[roomId].hasStarted = true
         start_new_round(roomId)
     } else {
         console.log(`Game started in room ${roomId} but this room does not exist !`)
@@ -131,26 +120,32 @@ function start_new_round(roomId: string) {
   console.log(`New round in room ${roomId}.`)
   // Get a random image path from the list of image paths
   const room_images = data[roomId].images
-  const random_image = room_images[Math.floor(Math.random() * room_images.length)]
+  if (room_images.length > 0) {
+    const random_image = room_images[Math.floor(Math.random() * room_images.length)]
 
-  // Remove the image from the list
-  data[roomId].images= data[roomId].images.filter(img => img !== random_image)
+    // Remove the image from the list
+    data[roomId].images = data[roomId].images.filter(img => img !== random_image)
 
-  // Emit the random image path to all clients in the room
-  io.in(roomId).emit('newRound', random_image)
+    // Emit the random image path to all clients in the room
+    io.in(roomId).emit('newRound', random_image)
 
-  // Reset votes and update users
-  for (const user_pseudo of Object.keys(data[roomId].users)) {
-    data[roomId].users[user_pseudo].vote = null
+    // Reset votes and update users
+    for (const user_pseudo of Object.keys(data[roomId].users)) {
+      data[roomId].users[user_pseudo].vote = null
+    }
+
+    data[roomId].timer = data[roomId].roundDuration
+
+    io.in(roomId).emit('updateRoomData', data[roomId])
+  } else {
+    console.log(`No more images in room ${roomId}.`)
+    io.in(roomId).emit('gameOver')
   }
-  io.in(roomId).emit('updateRoomData', data[roomId])
-
-  data[roomId].timer = round_duration
 }
 
 setInterval(function(){
   for (const roomId in data) {
-    if (data[roomId].has_started) {
+    if (data[roomId].hasStarted) {
       data[roomId].timer--
       if (data[roomId].timer <= 0) {
         const creator = data[roomId].creator

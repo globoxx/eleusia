@@ -17,7 +17,6 @@ var images_dir = path.join(build_path, 'images', 'cards');
 var images = fs.readdirSync(images_dir).filter(function (file) { return file.endsWith('.png'); }).map(function (file) { return path.join('images', 'cards', file); });
 var imageDimensions = (0, image_size_1.default)(path.join(build_path, images[0]));
 var imageSize = { width: (_a = imageDimensions.width) !== null && _a !== void 0 ? _a : 100, height: (_b = imageDimensions.height) !== null && _b !== void 0 ? _b : 100 };
-var round_duration = 10;
 var data = {};
 app.use(cors());
 app.use(express.static(build_path));
@@ -29,16 +28,16 @@ io.on('connection', function (socket) {
     console.log("User connected: ".concat(socket.id));
     socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(function (_a) {
         var roomData = _a[1];
-        return !roomData.has_started;
+        return !roomData.hasStarted;
     }))));
-    socket.on('createRoom', function (roomId, pseudo) {
+    socket.on('createRoom', function (pseudo, roomId, roundDuration) {
         var _a;
         console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " created new room ").concat(roomId));
         data[roomId] = {
-            counter: 0,
+            roundDuration: roundDuration,
             creator: pseudo,
-            has_started: false,
-            timer: round_duration,
+            hasStarted: false,
+            timer: roundDuration,
             images: images,
             imageSize: imageSize,
             users: (_a = {},
@@ -52,7 +51,7 @@ io.on('connection', function (socket) {
         io.in(roomId).emit('updateRoomData', data[roomId]);
         io.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(function (_a) {
             var roomData = _a[1];
-            return !roomData.has_started;
+            return !roomData.hasStarted;
         }))));
         console.log("List of rooms ".concat(Object.keys(data).toString()));
     });
@@ -70,20 +69,10 @@ io.on('connection', function (socket) {
             console.log('ROOM NOT FOUND');
         }
     });
-    socket.on('buttonClick', function (roomId, pseudo) {
-        console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " clicked button in room ").concat(roomId));
-        if (roomId in data) {
-            data[roomId].counter++;
-            io.in(roomId).emit('counter', data[roomId].counter);
-        }
-        else {
-            console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " clicked button in room ").concat(roomId, " but this room does not exist !"));
-        }
-    });
     socket.on('startGame', function (roomId) {
         console.log("Game started in room ".concat(roomId));
         if (roomId in data) {
-            data[roomId].has_started = true;
+            data[roomId].hasStarted = true;
             start_new_round(roomId);
         }
         else {
@@ -103,23 +92,29 @@ function start_new_round(roomId) {
     console.log("New round in room ".concat(roomId, "."));
     // Get a random image path from the list of image paths
     var room_images = data[roomId].images;
-    var random_image = room_images[Math.floor(Math.random() * room_images.length)];
-    // Remove the image from the list
-    data[roomId].images = data[roomId].images.filter(function (img) { return img !== random_image; });
-    // Emit the random image path to all clients in the room
-    io.in(roomId).emit('newRound', random_image);
-    // Reset votes and update users
-    for (var _i = 0, _a = Object.keys(data[roomId].users); _i < _a.length; _i++) {
-        var user_pseudo = _a[_i];
-        data[roomId].users[user_pseudo].vote = null;
+    if (room_images.length > 0) {
+        var random_image_1 = room_images[Math.floor(Math.random() * room_images.length)];
+        // Remove the image from the list
+        data[roomId].images = data[roomId].images.filter(function (img) { return img !== random_image_1; });
+        // Emit the random image path to all clients in the room
+        io.in(roomId).emit('newRound', random_image_1);
+        // Reset votes and update users
+        for (var _i = 0, _a = Object.keys(data[roomId].users); _i < _a.length; _i++) {
+            var user_pseudo = _a[_i];
+            data[roomId].users[user_pseudo].vote = null;
+        }
+        data[roomId].timer = data[roomId].roundDuration;
+        io.in(roomId).emit('updateRoomData', data[roomId]);
     }
-    io.in(roomId).emit('updateRoomData', data[roomId]);
-    data[roomId].timer = round_duration;
+    else {
+        console.log("No more images in room ".concat(roomId, "."));
+        io.in(roomId).emit('gameOver');
+    }
 }
 setInterval(function () {
     var _a;
     for (var roomId in data) {
-        if (data[roomId].has_started) {
+        if (data[roomId].hasStarted) {
             data[roomId].timer--;
             if (data[roomId].timer <= 0) {
                 var creator = data[roomId].creator;

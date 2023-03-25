@@ -7,6 +7,9 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
     const [pseudo, setPseudo] = useState('')
     const [room, setRoom] = useState('')
 
+    const [newRoom, setNewRoom] = useState('')
+    const [newRoomRoundDuration, setNewRoomRoundDuration] = useState(10)
+
     const handlePseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         callbackPseudoChange(e)
         setPseudo(e.target.value)
@@ -22,19 +25,16 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
             socket.emit('joinRoom', room, pseudo);
             callbackJoinRoom(room)
           } else {
-            alert('Cette room n\'existe pas.');
+            alert('Cette room n\'existe pas ou a déjà commencé.');
           }
         } else {
           alert('Choisissez un pseudo et un numéro de room à rejoindre.');
         }
     }
     const handleClickCreateRoom = () => {
-        const min = 1000
-        const max = 9999
-        const generated_room = (Math.floor(Math.random()*(max-min+1)+min)).toString();
         if (pseudo) {
-          socket.emit('createRoom', generated_room, pseudo);
-          callbackJoinRoom(generated_room)
+          socket.emit('createRoom', pseudo, newRoom, newRoomRoundDuration)
+          callbackJoinRoom(newRoom)
         } else {
           alert('Choisissez un pseudo pour rejoindre une room.');
         }
@@ -43,7 +43,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
     useEffect(()=>{
         socket.on('updateRooms', (rooms: string[]) => {
             setRooms(rooms)
-        });
+        })
     },[socket])
     
     return (
@@ -57,7 +57,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
         </Grid>
         <Grid container item direction="column" textAlign="center" spacing={2} xs={6}>
             <Grid item>
-                <TextField id="outlined-basic" label="Numéro de room" value={room} onChange={handleRoomChange} variant="outlined" />
+                <TextField id="outlined-basic" label="Room code" value={room} onChange={handleRoomChange} variant="outlined" />
             </Grid>
             <Grid item>
                 <Button variant="contained" disabled={pseudo.length === 0 || room.length === 0} onClick={handleClickJoinRoom}>Rejoindre une room !</Button>
@@ -69,7 +69,9 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                     Créer une nouvelle room
                 </AccordionSummary>
                 <AccordionDetails>
-                    <Button variant="contained" disabled={pseudo.length === 0} onClick={handleClickCreateRoom}>Créer la room !</Button>
+                    <TextField id="outlined-basic" label="Room code" value={newRoom} onChange={(e) => setNewRoom(e.target.value)} variant="outlined" />
+                    <TextField inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }} value={newRoomRoundDuration} onChange={(e) => setNewRoomRoundDuration(parseInt(e.target.value))} />
+                    <Button variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0} onClick={handleClickCreateRoom}>Créer la room !</Button>
                 </AccordionDetails>
             </Accordion>
         </Grid>
