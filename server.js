@@ -1,38 +1,48 @@
 "use strict";
-var _a, _b;
 Object.defineProperty(exports, "__esModule", { value: true });
 var express = require("express");
 var cors = require("cors");
 var http_1 = require("http");
 var socket_io_1 = require("socket.io");
-var fs = require("fs");
 var path = require("path");
 var image_size_1 = require("image-size");
+var fs = require("fs");
 var app = express();
 var httpServer = (0, http_1.createServer)(app);
 var io = new socket_io_1.Server(httpServer);
 var port = 5000;
 var build_path = path.join(__dirname, 'build');
-var images_dir = path.join(build_path, 'images', 'cards');
-var images = fs.readdirSync(images_dir).filter(function (file) { return file.endsWith('.png'); }).map(function (file) { return path.join('images', 'cards', file); });
-var imageDimensions = (0, image_size_1.default)(path.join(build_path, images[0]));
-var imageSize = { width: (_a = imageDimensions.width) !== null && _a !== void 0 ? _a : 100, height: (_b = imageDimensions.height) !== null && _b !== void 0 ? _b : 100 };
-var data = {};
 app.use(cors());
 app.use(express.static(build_path));
-app.use('/images', express.static(images_dir));
+app.use('/images', express.static(path.join(build_path, 'images')));
 app.get('/', function (_req, res) {
     res.sendFile(path.join(build_path, 'index.html'));
 });
+var data = {};
+var imagesFolder = path.join(build_path, 'images');
+var imageFolders = fs.readdirSync(imagesFolder);
+var allImages = {};
+var _loop_1 = function (imageFolder) {
+    allImages[imageFolder] = fs.readdirSync(path.join(imagesFolder, imageFolder)).filter(function (file) { return file.endsWith('.png') || file.endsWith('.jpg'); }).map(function (file) { return path.join('images', imageFolder, file); });
+};
+for (var _i = 0, imageFolders_1 = imageFolders; _i < imageFolders_1.length; _i++) {
+    var imageFolder = imageFolders_1[_i];
+    _loop_1(imageFolder);
+}
 io.on('connection', function (socket) {
     console.log("User connected: ".concat(socket.id));
     socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(function (_a) {
         var roomData = _a[1];
         return !roomData.hasStarted;
     }))));
-    socket.on('createRoom', function (pseudo, roomId, roundDuration) {
+    socket.emit("updateImages", allImages);
+    socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet) {
         var _a;
+        var _b, _c;
         console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " created new room ").concat(roomId));
+        var images = allImages[imageSet];
+        var imageDimensions = (0, image_size_1.default)(path.join(build_path, images[0]));
+        var imageSize = { width: (_b = imageDimensions.width) !== null && _b !== void 0 ? _b : 100, height: (_c = imageDimensions.height) !== null && _c !== void 0 ? _c : 100 };
         data[roomId] = {
             roundDuration: roundDuration,
             creator: pseudo,
@@ -116,6 +126,9 @@ setInterval(function () {
     for (var roomId in data) {
         if (data[roomId].hasStarted) {
             data[roomId].timer--;
+            if (Object.values(data[roomId].users).map(function (user) { return user.vote; }).every(function (vote) { return vote !== null; })) {
+                data[roomId].timer = 0;
+            }
             if (data[roomId].timer <= 0) {
                 var creator = data[roomId].creator;
                 var creatorVote = data[roomId].users[creator].vote;
@@ -130,7 +143,7 @@ setInterval(function () {
                             usersPoints[userPseudo] = points;
                         }
                     }
-                    io.in(roomId).emit('points', usersPoints);
+                    io.in(roomId).emit('endOfRound', usersPoints, creatorVote);
                     // -----------------------------------------------------
                     start_new_round(roomId);
                 }

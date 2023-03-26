@@ -66,16 +66,7 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
 
     const handleClickVote = (vote: number) => {
         socket.emit('vote', room, pseudo, vote);
-        
         setVotingDisabled(true)
-
-        if (vote > 0) {
-            setAcceptedImages([...acceptedImages, currentImage])
-        } else {
-            setRefusedImages([...refusedImages, currentImage])
-        }
-
-        setCurrentImage('')
     }
 
     const handleModalClose = () => {
@@ -103,13 +94,21 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
             setWaitOnCreator(true)
         })
 
-        socket.on('points', (usersPoints: {[pseudo: string]: number}) => {
+        socket.on('endOfRound', (usersPoints: {[pseudo: string]: number}, creatorVote: number) => {
+            if (creatorVote > 0) {
+                setAcceptedImages([...acceptedImages, currentImage])
+            } else {
+                setRefusedImages([...refusedImages, currentImage])
+            }
+
+            setCurrentImage('')
+            
             if (!isRoomCreator) {
                 setModalPoints(usersPoints[pseudo])
                 setIsModalOpen(true)
             }
         })
-    },[isRoomCreator, pseudo, socket, waitOnCreator])
+    },[acceptedImages, currentImage, isRoomCreator, pseudo, refusedImages, socket, waitOnCreator])
 
     return (
         <>
@@ -153,7 +152,7 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
                         : (
                             <>
                                 <Grid container item alignItems="center" justifyContent="center" xs={12}>
-                                    <Box width={1/4}>
+                                    <Box width={1/3}>
                                         <Slider defaultValue={0} aria-label="Default" valueLabelDisplay="auto" step={0.1} min={-1} max={1} marks={marks} onChange={handleDecisionChange} />
                                     </Box>
                                 </Grid><Grid item textAlign="center" xs={12}>

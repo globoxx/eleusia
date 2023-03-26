@@ -2,9 +2,9 @@ import express = require('express')
 import cors = require('cors')
 import { createServer } from "http"
 import { Server, Socket } from "socket.io"
-import * as fs from 'fs'
-import * as path from "path"
+import path = require('path')
 import sizeOf from 'image-size'
+import * as fs from 'fs'
 
 const app = express()
 const httpServer = createServer(app)
@@ -14,15 +14,9 @@ const io = new Server(httpServer)
 const port = 5000
 const build_path = path.join(__dirname, 'build')
 
-const images_dir = path.join(build_path, 'images', 'cards')
-const images = fs.readdirSync(images_dir).filter(file => file.endsWith('.png')).map(file => path.join('images', 'cards', file))
-const imageDimensions = sizeOf(path.join(build_path, images[0]))
-const imageSize = {width: imageDimensions.width ?? 100, height: imageDimensions.height ?? 100}
-const data: Data = {}
-
 app.use(cors())
 app.use(express.static(build_path))
-app.use('/images', express.static(images_dir))
+app.use('/images', express.static(path.join(build_path, 'images')))
 
 app.get('/', function(_req, res) {
   res.sendFile(path.join(build_path, 'index.html'))
@@ -41,6 +35,7 @@ export interface RoomData {
   roundDuration: number,
   creator: string,
   hasStarted: boolean,
+  hasFinished: boolean,
   timer: number,
   images: string[]
   imageSize: {width: number, height: number},
@@ -51,17 +46,31 @@ export interface Data {
   [roomId: string]: RoomData
 }
 
+const data: Data = {}
+
+const imagesFolder = path.join(build_path, 'images')
+const imageFolders = fs.readdirSync(imagesFolder)
+const allImages: {[folder: string]: string[]} = {}
+for (const imageFolder of imageFolders) {
+  allImages[imageFolder] = fs.readdirSync(path.join(imagesFolder, imageFolder)).filter((file: string) => file.endsWith('.png') || file.endsWith('.jpg')).map((file: string) => path.join('images', imageFolder, file))
+}
+
 io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.id}`)
 
   socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
+  socket.emit("updateImages", allImages)
 
-  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number) => {
+  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string) => {
     console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId}`)
+    const images = allImages[imageSet]
+    const imageDimensions = sizeOf(path.join(build_path, images[0]))
+    const imageSize = {width: imageDimensions.width ?? 100, height: imageDimensions.height ?? 100}
     data[roomId] = {
       roundDuration: roundDuration,
       creator: pseudo,
       hasStarted: false,
+      hasFinished: false,
       timer: roundDuration,
       images: images,
       imageSize: imageSize,
@@ -117,10 +126,10 @@ io.on('connection', (socket: Socket) => {
 })
 
 function start_new_round(roomId: string) {
-  console.log(`New round in room ${roomId}.`)
-  // Get a random image path from the list of image paths
   const room_images = data[roomId].images
+  
   if (room_images.length > 0) {
+    console.log(`New round in room ${roomId}.`)
     const random_image = room_images[Math.floor(Math.random() * room_images.length)]
 
     // Remove the image from the list
@@ -135,18 +144,21 @@ function start_new_round(roomId: string) {
     }
 
     data[roomId].timer = data[roomId].roundDuration
-
-    io.in(roomId).emit('updateRoomData', data[roomId])
   } else {
     console.log(`No more images in room ${roomId}.`)
-    io.in(roomId).emit('gameOver')
+    data[roomId].hasFinished = true
   }
+
+  io.in(roomId).emit('updateRoomData', data[roomId])
 }
 
 setInterval(function(){
   for (const roomId in data) {
     if (data[roomId].hasStarted) {
       data[roomId].timer--
+      if (Object.values(data[roomId].users).map(user => user.vote).every(vote => vote !== null)) {
+        data[roomId].timer = 0
+      }
       if (data[roomId].timer <= 0) {
         const creator = data[roomId].creator
         const creatorVote = data[roomId].users[creator].vote
@@ -160,7 +172,7 @@ setInterval(function(){
               usersPoints[userPseudo] = points
             }
           }
-          io.in(roomId).emit('points', usersPoints)
+          io.in(roomId).emit('endOfRound', usersPoints, creatorVote)
           // -----------------------------------------------------
           start_new_round(roomId)
         } else {

@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails} from '@mui/material';
-import { Socket } from 'socket.io-client';
+import React, { useEffect, useState } from 'react'
+import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box} from '@mui/material'
+import { Socket } from 'socket.io-client'
 
 function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoom}: {socket: Socket, callbackPseudoChange: (e: React.ChangeEvent<HTMLInputElement>) => void, callbackRoomChange: (e: React.ChangeEvent<HTMLInputElement>) => void, callbackJoinRoom: (room: string) => void}) {
     const [rooms, setRooms] = useState<string[]>([])
     const [pseudo, setPseudo] = useState('')
     const [room, setRoom] = useState('')
 
+    const [allImages, setAllImages] = useState<{[folder: string]: string[]}>({})
+
     const [newRoom, setNewRoom] = useState('')
     const [newRoomRoundDuration, setNewRoomRoundDuration] = useState(10)
+    const [newRoomImageSet, setNewRoomImageSet] = useState('')
+
+    const selectedImages = newRoomImageSet && allImages[newRoomImageSet] ? allImages[newRoomImageSet] : []
 
     const handlePseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         callbackPseudoChange(e)
@@ -33,7 +38,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
     }
     const handleClickCreateRoom = () => {
         if (pseudo) {
-          socket.emit('createRoom', pseudo, newRoom, newRoomRoundDuration)
+          socket.emit('createRoom', pseudo, newRoom, newRoomRoundDuration, newRoomImageSet)
           callbackJoinRoom(newRoom)
         } else {
           alert('Choisissez un pseudo pour rejoindre une room.');
@@ -43,6 +48,10 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
     useEffect(()=>{
         socket.on('updateRooms', (rooms: string[]) => {
             setRooms(rooms)
+        })
+
+        socket.on('updateImages', (allImages: {[folder: string]: string[]}) => {
+            setAllImages(allImages)
         })
     },[socket])
     
@@ -71,12 +80,36 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                 <AccordionDetails>
                     <TextField id="outlined-basic" label="Room code" value={newRoom} onChange={(e) => setNewRoom(e.target.value)} variant="outlined" />
                     <TextField inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }} value={newRoomRoundDuration} onChange={(e) => setNewRoomRoundDuration(parseInt(e.target.value))} />
-                    <Button variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0} onClick={handleClickCreateRoom}>Créer la room !</Button>
+                    <Select
+                        labelId="demo-simple-select-label"
+                        id="demo-simple-select"
+                        value={newRoomImageSet}
+                        label="Images"
+                        onChange={(e) => setNewRoomImageSet(e.target.value)}
+                    >
+                        <MenuItem value={'cards'}>Cartes</MenuItem>
+                        <MenuItem value={'abstract'}>Abstrait</MenuItem>
+                    </Select>
+                    <Box sx={{maxHeight: 200, overflow: 'auto'}}>
+                        <ImageList variant="masonry" cols={3}>
+                            {selectedImages.map((item: string) => (
+                                <ImageListItem key={item}>
+                                <img
+                                    src={`${item}?w=50&fit=crop&auto=format`}
+                                    srcSet={`${item}?w=50&fit=crop&auto=format&dpr=2 2x`}
+                                    alt={item}
+                                    loading="lazy"
+                                />
+                                </ImageListItem>
+                            ))}
+                    </ImageList>
+                    </Box>
+                    <Button variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0 || newRoomImageSet.length === 0} onClick={handleClickCreateRoom}>Créer la room !</Button>
                 </AccordionDetails>
             </Accordion>
         </Grid>
     </Grid>
-    );
+    )
 }
 
-export default Home;
+export default Home
