@@ -47,6 +47,7 @@ io.on('connection', function (socket) {
             roundDuration: roundDuration,
             creator: pseudo,
             hasStarted: false,
+            hasFinished: false,
             timer: roundDuration,
             images: images,
             imageSize: imageSize,
@@ -83,7 +84,7 @@ io.on('connection', function (socket) {
         console.log("Game started in room ".concat(roomId));
         if (roomId in data) {
             data[roomId].hasStarted = true;
-            start_new_round(roomId);
+            startNewRound(roomId);
         }
         else {
             console.log("Game started in room ".concat(roomId, " but this room does not exist !"));
@@ -98,11 +99,10 @@ io.on('connection', function (socket) {
         console.log("User disconnected: ".concat(socket.id));
     });
 });
-function start_new_round(roomId) {
-    console.log("New round in room ".concat(roomId, "."));
-    // Get a random image path from the list of image paths
+function startNewRound(roomId) {
     var room_images = data[roomId].images;
     if (room_images.length > 0) {
+        console.log("New round in room ".concat(roomId, "."));
         var random_image_1 = room_images[Math.floor(Math.random() * room_images.length)];
         // Remove the image from the list
         data[roomId].images = data[roomId].images.filter(function (img) { return img !== random_image_1; });
@@ -114,12 +114,12 @@ function start_new_round(roomId) {
             data[roomId].users[user_pseudo].vote = null;
         }
         data[roomId].timer = data[roomId].roundDuration;
-        io.in(roomId).emit('updateRoomData', data[roomId]);
     }
     else {
         console.log("No more images in room ".concat(roomId, "."));
-        io.in(roomId).emit('gameOver');
+        data[roomId].hasFinished = true;
     }
+    io.in(roomId).emit('updateRoomData', data[roomId]);
 }
 setInterval(function () {
     var _a;
@@ -145,7 +145,7 @@ setInterval(function () {
                     }
                     io.in(roomId).emit('endOfRound', usersPoints, creatorVote);
                     // -----------------------------------------------------
-                    start_new_round(roomId);
+                    startNewRound(roomId);
                 }
                 else {
                     console.log('CREATOR VOTE IS NULL, WAIT ON HIM');

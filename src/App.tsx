@@ -1,4 +1,3 @@
-// import packages
 import React, { useEffect, useState } from 'react'
 import { io, Socket } from "socket.io-client";
 import GameBoard from './components/GameBoard';
@@ -7,7 +6,6 @@ import { RoomData } from '../server';
 
 const socket: Socket = io()
 
-// Making the App component
 function App() {
   useEffect(()=>{
     socket.on('connect', () => console.log(socket.id))

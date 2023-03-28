@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box} from '@mui/material'
 import { Socket } from 'socket.io-client'
+import { ExpandMoreOutlined } from '@mui/icons-material'
 
 function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoom}: {socket: Socket, callbackPseudoChange: (e: React.ChangeEvent<HTMLInputElement>) => void, callbackRoomChange: (e: React.ChangeEvent<HTMLInputElement>) => void, callbackJoinRoom: (room: string) => void}) {
     const [rooms, setRooms] = useState<string[]>([])
@@ -74,7 +75,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
         </Grid>
         <Grid item textAlign="center" xs={6}>
             <Accordion>
-                <AccordionSummary>
+                <AccordionSummary expandIcon={<ExpandMoreOutlined />} aria-controls="panel1a-content" id="panel1a-header" >
                     Créer une nouvelle room
                 </AccordionSummary>
                 <AccordionDetails>
@@ -91,7 +92,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                         <MenuItem value={'abstract'}>Abstrait</MenuItem>
                     </Select>
                     <Box sx={{maxHeight: 200, overflow: 'auto'}}>
-                        <ImageList variant="masonry" cols={3}>
+                        <ImageList variant="masonry" cols={10}>
                             {selectedImages.map((item: string) => (
                                 <ImageListItem key={item}>
                                 <img

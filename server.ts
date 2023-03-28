@@ -108,7 +108,7 @@ io.on('connection', (socket: Socket) => {
     console.log(`Game started in room ${roomId}`)
     if (roomId in data) {
         data[roomId].hasStarted = true
-        start_new_round(roomId)
+        startNewRound(roomId)
     } else {
         console.log(`Game started in room ${roomId} but this room does not exist !`)
     }
@@ -125,7 +125,7 @@ io.on('connection', (socket: Socket) => {
   })
 })
 
-function start_new_round(roomId: string) {
+function startNewRound(roomId: string) {
   const room_images = data[roomId].images
   
   if (room_images.length > 0) {
@@ -174,7 +174,7 @@ setInterval(function(){
           }
           io.in(roomId).emit('endOfRound', usersPoints, creatorVote)
           // -----------------------------------------------------
-          start_new_round(roomId)
+          startNewRound(roomId)
         } else {
           console.log('CREATOR VOTE IS NULL, WAIT ON HIM')
           io.in(roomId).emit('waitCreator')
