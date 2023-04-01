@@ -24,6 +24,7 @@ app.get('/', function(_req, res) {
 
 export interface User {
   score: number,
+  lastScore: number | null,
   vote: number | null
 }
 
@@ -32,6 +33,7 @@ export interface Users {
 }
 
 export interface RoomData {
+  rule: string,
   roundDuration: number,
   creator: string,
   hasStarted: boolean,
@@ -67,6 +69,7 @@ io.on('connection', (socket: Socket) => {
     const imageDimensions = sizeOf(path.join(build_path, images[0]))
     const imageSize = {width: imageDimensions.width ?? 100, height: imageDimensions.height ?? 100}
     data[roomId] = {
+      rule: '',
       roundDuration: roundDuration,
       creator: pseudo,
       hasStarted: false,
@@ -77,6 +80,7 @@ io.on('connection', (socket: Socket) => {
       users: {
         [pseudo]: {
           score: 0,
+          lastScore: null,
           vote: null
         }
       }
@@ -96,6 +100,7 @@ io.on('connection', (socket: Socket) => {
       socket.join(roomId)
       data[roomId].users[pseudo] = {
         score: 0,
+        lastScore: null,
         vote: null
       }
       io.in(roomId).emit('updateRoomData', data[roomId])
@@ -154,7 +159,7 @@ function startNewRound(roomId: string) {
 
 setInterval(function(){
   for (const roomId in data) {
-    if (data[roomId].hasStarted) {
+    if (data[roomId].hasStarted && !data[roomId].hasFinished) {
       data[roomId].timer--
       if (Object.values(data[roomId].users).map(user => user.vote).every(vote => vote !== null)) {
         data[roomId].timer = 0
@@ -168,6 +173,7 @@ setInterval(function(){
             if (userPseudo !== creator) {
               const userVote = data[roomId].users[userPseudo].vote ?? 0
               const points = Math.round((1 - Math.abs(creatorVote - userVote)) * 100)
+              data[roomId].users[userPseudo].lastScore = points
               data[roomId].users[userPseudo].score += points
               usersPoints[userPseudo] = points
             }

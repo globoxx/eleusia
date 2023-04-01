@@ -15,7 +15,8 @@ function UsersTable({roomData}: {roomData: RoomData}) {
             <TableHead>
             <TableRow>
                 <TableCell>Joueur</TableCell>
-                <TableCell align="right">Score</TableCell>
+                <TableCell align="right">Dernier score</TableCell>
+                <TableCell align="right">Score total</TableCell>
             </TableRow>
             </TableHead>
             <TableBody>
@@ -28,6 +29,7 @@ function UsersTable({roomData}: {roomData: RoomData}) {
                     <TableCell component="th" scope="row">
                         {pseudo}
                     </TableCell>
+                    <TableCell align="right">{user.lastScore ?? '-'}</TableCell>
                     <TableCell align="right">{user.score}</TableCell>
                     </TableRow>
                 )

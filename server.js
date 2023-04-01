@@ -44,6 +44,7 @@ io.on('connection', function (socket) {
         var imageDimensions = (0, image_size_1.default)(path.join(build_path, images[0]));
         var imageSize = { width: (_b = imageDimensions.width) !== null && _b !== void 0 ? _b : 100, height: (_c = imageDimensions.height) !== null && _c !== void 0 ? _c : 100 };
         data[roomId] = {
+            rule: '',
             roundDuration: roundDuration,
             creator: pseudo,
             hasStarted: false,
@@ -54,6 +55,7 @@ io.on('connection', function (socket) {
             users: (_a = {},
                 _a[pseudo] = {
                     score: 0,
+                    lastScore: null,
                     vote: null
                 },
                 _a)
@@ -72,6 +74,7 @@ io.on('connection', function (socket) {
             socket.join(roomId);
             data[roomId].users[pseudo] = {
                 score: 0,
+                lastScore: null,
                 vote: null
             };
             io.in(roomId).emit('updateRoomData', data[roomId]);
@@ -124,7 +127,7 @@ function startNewRound(roomId) {
 setInterval(function () {
     var _a;
     for (var roomId in data) {
-        if (data[roomId].hasStarted) {
+        if (data[roomId].hasStarted && !data[roomId].hasFinished) {
             data[roomId].timer--;
             if (Object.values(data[roomId].users).map(function (user) { return user.vote; }).every(function (vote) { return vote !== null; })) {
                 data[roomId].timer = 0;
@@ -139,6 +142,7 @@ setInterval(function () {
                         if (userPseudo !== creator) {
                             var userVote = (_a = data[roomId].users[userPseudo].vote) !== null && _a !== void 0 ? _a : 0;
                             var points = Math.round((1 - Math.abs(creatorVote - userVote)) * 100);
+                            data[roomId].users[userPseudo].lastScore = points;
                             data[roomId].users[userPseudo].score += points;
                             usersPoints[userPseudo] = points;
                         }

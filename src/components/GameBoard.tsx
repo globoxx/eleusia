@@ -1,4 +1,4 @@
-import { Box, Grid, Slider } from '@mui/material';
+import { Box, Grid, Slider, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
 import Image from 'mui-image'
 import React, { useState } from 'react';
@@ -10,7 +10,7 @@ import UsersTable from './UsersTable';
 import PointsModal from './PointsModal';
 import Timer from './Timer';
 
-const imageWidth = 200
+//const imageWidth = 200
 const minPlayers = 1
 
 const marks = [
@@ -49,7 +49,7 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [modalPoints, setModalPoints] = useState(0)
 
-    const imageHeight = roomData.imageSize.height * imageWidth / roomData.imageSize.width
+    //const imageHeight = roomData.imageSize.height * imageWidth / roomData.imageSize.width
 
     const isRoomCreator = roomData ? pseudo === roomData.creator : false
 
@@ -112,29 +112,31 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
 
     return (
         <>
-        <Grid container justifyContent="space-evenly" alignItems="center">
+        <Grid container justifyContent="space-evenly" alignItems="center" spacing={2}>
             <Grid item textAlign="center" xs={12}>
-                <h1>Room {room}</h1>
+                <Typography variant="h3">Room {room}</Typography>
             </Grid>
             <Grid container item alignItems="center" justifyContent="center" xs={12}>
                 <Timer key={timerKey} roundDuration={roomData.roundDuration} isPlaying={roomData.hasStarted} />
             </Grid>
-            <Grid container item textAlign="center" xs={8}>
-                <Grid container item justifyContent="space-evenly" alignItems="center">
+            <Grid container item textAlign="center" xs={8} spacing={2}>
+                <Grid container item justifyContent="space-evenly" alignItems="center" xs={12}>
                     <Grid item textAlign="center" xs={6}>
-                        <Box sx={{ border: 1 }}>
+                        <Typography variant="h6">Images refusées par le maître</Typography>
+                        <Box sx={{ border: 1, height: 200}}>
                             <ImagesContainer images={refusedImages} category={"Refusé"} />
                         </Box>
                     </Grid>
                     <Grid item textAlign="center" xs={6}>
-                        <Box sx={{ border: 1 }}>
+                        <Typography variant="h6">Images acceptées par le maître</Typography>
+                        <Box sx={{ border: 1, height: 200}}>
                             <ImagesContainer images={acceptedImages} category={"Accepté"} />
                         </Box>
                     </Grid>
                 </Grid>
                 <Grid container item alignItems="center" justifyContent="center" xs={12}>
-                    <Box sx={{ width: imageWidth, height: imageHeight, border: 1 }}>
-                        {currentImage ? <Image src={currentImage} width={imageWidth} /> : null}
+                    <Box sx={{ height: 200 }}>
+                        {currentImage ? <Image src={currentImage} duration={1000} height={200} /> : null}
                     </Box>
                 </Grid>
                 <Grid container item textAlign="center" alignItems="center" xs={12}>
@@ -162,8 +164,8 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
                         )}
                 </Grid>
             </Grid>
-            <Grid container item direction="column" alignItems="center" justifyContent="center" xs={4}>
-                <h1>Score: {roomData ? roomData.users[pseudo].score : 0}</h1>
+            <Grid container direction="column" alignItems="center" justifyContent="flex-start" xs={4}>
+                {!isRoomCreator && <Typography variant="h6">{roomData ? roomData.users[pseudo].score : 0}</Typography>}
                 <Box sx={{ border: 1, m: 5 }}>
                     {roomData ? <UsersTable roomData={roomData} /> : null}
                 </Box>
