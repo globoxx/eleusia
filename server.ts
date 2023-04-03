@@ -132,6 +132,10 @@ io.on('connection', (socket: Socket) => {
         if (data[roomId].users[userPseudo].socketId === socket.id) {
           delete data[roomId].users[userPseudo]
           io.in(roomId).emit('updateRoomData', data[roomId])
+          if (userPseudo === data[roomId].creator) {
+            // The creator of the room left
+            data[roomId].hasFinished = true
+          }
         }
       }
     }
