@@ -10,7 +10,6 @@ import UsersTable from './UsersTable';
 import PointsModal from './PointsModal';
 import Timer from './Timer';
 
-//const imageWidth = 200
 const minPlayers = 1
 
 const marks = [
@@ -48,8 +47,6 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
 
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [modalPoints, setModalPoints] = useState(0)
-
-    //const imageHeight = roomData.imageSize.height * imageWidth / roomData.imageSize.width
 
     const isRoomCreator = roomData ? pseudo === roomData.creator : false
 

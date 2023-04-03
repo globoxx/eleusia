@@ -3,7 +3,6 @@ import cors = require('cors')
 import { createServer } from "http"
 import { Server, Socket } from "socket.io"
 import path = require('path')
-import sizeOf from 'image-size'
 import * as fs from 'fs'
 
 const app = express()
@@ -41,7 +40,6 @@ export interface RoomData {
   hasFinished: boolean,
   timer: number,
   images: string[]
-  imageSize: {width: number, height: number},
   users: Users
 }
 
@@ -67,8 +65,6 @@ io.on('connection', (socket: Socket) => {
   socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string) => {
     console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId}`)
     const images = allImages[imageSet]
-    const imageDimensions = sizeOf(path.join(build_path, images[0]))
-    const imageSize = {width: imageDimensions.width ?? 100, height: imageDimensions.height ?? 100}
     data[roomId] = {
       rule: '',
       roundDuration: roundDuration,
@@ -77,7 +73,6 @@ io.on('connection', (socket: Socket) => {
       hasFinished: false,
       timer: roundDuration,
       images: images,
-      imageSize: imageSize,
       users: {
         [pseudo]: {
           socketId: socket.id,
