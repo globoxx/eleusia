@@ -23,6 +23,7 @@ app.get('/', function(_req, res) {
 })
 
 export interface User {
+  socketId: string,
   score: number,
   lastScore: number | null,
   vote: number | null
@@ -79,6 +80,7 @@ io.on('connection', (socket: Socket) => {
       imageSize: imageSize,
       users: {
         [pseudo]: {
+          socketId: socket.id,
           score: 0,
           lastScore: null,
           vote: null
@@ -99,6 +101,7 @@ io.on('connection', (socket: Socket) => {
       console.log(`User ${socket.id} with pseudo ${pseudo} joined room ${roomId}`)
       socket.join(roomId)
       data[roomId].users[pseudo] = {
+        socketId: socket.id,
         score: 0,
         lastScore: null,
         vote: null
@@ -127,6 +130,16 @@ io.on('connection', (socket: Socket) => {
 
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`)
+
+    // Remove the user associated to the socket from the data
+    for (const roomId in Object.keys(data)) {
+      for (const userPseudo in Object.keys(data[roomId])) {
+        if (data[roomId].users[userPseudo].socketId === socket.id) {
+          delete data[roomId].users[userPseudo]
+          io.in(roomId).emit('updateRoomData', data[roomId])
+        }
+      }
+    }
   })
 })
 
