@@ -39,7 +39,7 @@ function UsersTable({roomData}: {roomData: RoomData}) {
             <TableFooter>
                 {!roomData.hasStarted && (
                     <TableCell align="center" colSpan={3}>
-                        <Typography variant="h6">En attende de joueur...</Typography>
+                        <Typography variant="h6">En attende de joueurs...</Typography>
                     </TableCell>
                     )
                 }
