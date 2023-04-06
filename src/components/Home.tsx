@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack, IconButton} from '@mui/material'
+import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack, IconButton, Tooltip, Divider} from '@mui/material'
 import { Socket } from 'socket.io-client'
 import { ExpandMoreOutlined, FileDownloadOutlined } from '@mui/icons-material'
 
@@ -113,7 +113,9 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                                 <MenuItem value={'cards'}>Cartes</MenuItem>
                                 <MenuItem value={'abstract'}>Art abstrait</MenuItem>
                             </Select>
-                            <IconButton color="primary" onClick={() => downloadImages(newRoomImageSet)} disabled={newRoomImageSet.length === 0}><FileDownloadOutlined /></IconButton>
+                            <Tooltip title="Télécharger">
+                                <IconButton color="primary" onClick={() => downloadImages(newRoomImageSet)} disabled={newRoomImageSet.length === 0}><FileDownloadOutlined /></IconButton>
+                            </Tooltip>
                         </Stack>
                         <Box sx={{maxHeight: 200, overflow: 'auto'}}>
                             <ImageList variant="masonry" cols={8}>
