@@ -32,7 +32,7 @@ function EndOfGameModal({rule, open}: {rule: string, open: boolean}) {
                     <Typography id="modal-modal-title" variant="h3" component="h2">
                         La partie est terminée !
                     </Typography>
-                    <Typography id="modal-modal-description">
+                    <Typography marginTop={5} id="modal-modal-description">
                         La règle était : <em>{rule}</em>
                     </Typography>
                 </Box>

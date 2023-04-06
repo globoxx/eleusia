@@ -12,39 +12,37 @@ import { TableFooter, Typography } from '@mui/material';
 function UsersTable({roomData}: {roomData: RoomData}) {
     return (
         <TableContainer component={Paper}>
-        <Table aria-label="simple table">
-            <TableHead>
-            <TableRow>
-                <TableCell>Joueur</TableCell>
-                <TableCell>Dernier score</TableCell>
-                <TableCell>Score total</TableCell>
-            </TableRow>
-            </TableHead>
-            <TableBody>
-            {Object.entries(roomData.users).map(([pseudo, user]: [string, User]) => (
-                (pseudo !== roomData.creator) && (
-                    <TableRow
-                    key={pseudo}
-                    sx={{ '&:last-child td, &:last-child th': { border: 0, color: (user.vote ? 'green' : 'red') } }}
-                    >
-                    <TableCell component="th" scope="row">
-                        {pseudo}
-                    </TableCell>
-                    <TableCell align="center">{user.lastScore ?? '-'}</TableCell>
-                    <TableCell align="center">{user.score}</TableCell>
+            <Table aria-label="simple table">
+                <TableHead>
+                    <TableRow>
+                        <TableCell>Joueur</TableCell>
+                        <TableCell>Dernier score</TableCell>
+                        <TableCell>Score total</TableCell>
                     </TableRow>
-                )
-            ))}
-            </TableBody>
-            <TableFooter>
-                {!roomData.hasStarted && (
-                    <TableCell align="center" colSpan={3}>
-                        <Typography variant="h6">En attende de joueurs...</Typography>
-                    </TableCell>
+                </TableHead>
+                <TableBody>
+                {Object.entries(roomData.users).sort(([, user]: [string, User]) => -user.score).map(([pseudo, user]: [string, User]) => (
+                    (pseudo !== roomData.creator) && (
+                        <TableRow
+                            key={pseudo}
+                            sx={{ '&:last-child td, &:last-child th': { border: 0, color: (user.vote ? 'green' : 'red') } }}
+                        >
+                            <TableCell component="th" scope="row">{pseudo}</TableCell>
+                            <TableCell align="center">{user.lastScore ?? '-'}</TableCell>
+                            <TableCell align="center">{user.score}</TableCell>
+                        </TableRow>
                     )
-                }
-            </TableFooter>
-        </Table>
+                ))}
+                </TableBody>
+                <TableFooter>
+                    {!roomData.hasStarted && (
+                        <TableCell align="center" colSpan={3}>
+                            <Typography variant="h6">En attende de joueurs...</Typography>
+                        </TableCell>
+                        )
+                    }
+                </TableFooter>
+            </Table>
         </TableContainer>
     )
 }

@@ -1,4 +1,4 @@
-import { Box, Grid, Slider, Stack, Typography } from '@mui/material';
+import { Box, Grid, Paper, Slider, Stack, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
 import Image from 'mui-image'
 import React, { useState } from 'react';
@@ -115,22 +115,19 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
             <Grid item textAlign="center" xs={12}>
                 <Typography variant="h3">Room {room}</Typography>
             </Grid>
-            <Grid item xs={12}>
-                <Timer key={timerKey} roundDuration={roomData.roundDuration} isPlaying={roomData.hasStarted} />
-            </Grid>
             <Grid container item textAlign="center" xs={8} spacing={2}>
-                <Grid container item justifyContent="space-evenly" alignItems="center" xs={12}>
+                <Grid container item justifyContent="space-evenly" alignItems="center" spacing={2} xs={12}>
                     <Grid item textAlign="center" xs={6}>
                         <Typography variant="h6">Images refusées par le maître</Typography>
-                        <Box sx={{ border: 1, height: 200}}>
+                        <Paper sx={{ height: 200 }} elevation={3}>
                             <ImagesContainer images={refusedImages} category={"Refusé"} />
-                        </Box>
+                        </Paper>
                     </Grid>
                     <Grid item textAlign="center" xs={6}>
                         <Typography variant="h6">Images acceptées par le maître</Typography>
-                        <Box sx={{ border: 1, height: 200}}>
+                        <Paper sx={{ height: 200 }} elevation={3}>
                             <ImagesContainer images={acceptedImages} category={"Accepté"} />
-                        </Box>
+                        </Paper>
                     </Grid>
                 </Grid>
                 <Grid container item alignItems="center" justifyContent="center" xs={12}>
@@ -164,6 +161,7 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
             </Grid>
             <Grid item alignSelf="flex-start" xs={4}>
                 <Stack alignItems="center" justifyContent="flex-start" spacing={2}>
+                    <Timer key={timerKey} roundDuration={roomData.roundDuration} isPlaying={roomData.hasStarted} />
                     {!isRoomCreator && <Typography variant="h6">{'Score: ' + (roomData ? roomData.users[pseudo].score : 0)}</Typography>}
                     <Box sx={{ border: 1, m: 5, marginBottom: 2 }}>
                         {roomData ? <UsersTable roomData={roomData} /> : null}

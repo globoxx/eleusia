@@ -3,6 +3,7 @@ import { io, Socket } from "socket.io-client";
 import GameBoard from './components/GameBoard';
 import Home from './components/Home'
 import { RoomData } from '../server';
+import { Box } from '@mui/material';
 
 const socket: Socket = io()
 
@@ -31,12 +32,12 @@ function App() {
   }
 
   return (
-    <div>
+    <Box padding={2}>
       {isInGame && roomData
         ? <GameBoard socket={socket} pseudo={pseudo} room={room} roomData={roomData} />
         : <Home socket={socket} callbackPseudoChange={callbackPseudoChange} callbackRoomChange={callbackRoomChange} callbackJoinRoom={callbackJoinRoom} />
       }
-    </div>
+    </Box>
   )
 }
 
