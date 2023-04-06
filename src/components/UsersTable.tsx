@@ -7,6 +7,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import { User, RoomData } from '../../server';
+import { TableFooter, Typography } from '@mui/material';
 
 function UsersTable({roomData}: {roomData: RoomData}) {
     return (
@@ -15,8 +16,8 @@ function UsersTable({roomData}: {roomData: RoomData}) {
             <TableHead>
             <TableRow>
                 <TableCell>Joueur</TableCell>
-                <TableCell align="right">Dernier score</TableCell>
-                <TableCell align="right">Score total</TableCell>
+                <TableCell>Dernier score</TableCell>
+                <TableCell>Score total</TableCell>
             </TableRow>
             </TableHead>
             <TableBody>
@@ -29,20 +30,20 @@ function UsersTable({roomData}: {roomData: RoomData}) {
                     <TableCell component="th" scope="row">
                         {pseudo}
                     </TableCell>
-                    <TableCell align="right">{user.lastScore ?? '-'}</TableCell>
-                    <TableCell align="right">{user.score}</TableCell>
+                    <TableCell align="center">{user.lastScore ?? '-'}</TableCell>
+                    <TableCell align="center">{user.score}</TableCell>
                     </TableRow>
                 )
             ))}
-            {!roomData.hasStarted && (
-                <TableRow sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                    <TableCell component="th" scope="row">
-                        En attende de joueur...
-                    </TableCell>
-                </TableRow>
-                )
-            }
             </TableBody>
+            <TableFooter>
+                {!roomData.hasStarted && (
+                    <TableCell align="center" colSpan={3}>
+                        <Typography variant="h6">En attende de joueur...</Typography>
+                    </TableCell>
+                    )
+                }
+            </TableFooter>
         </Table>
         </TableContainer>
     )

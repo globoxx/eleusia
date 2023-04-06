@@ -62,11 +62,11 @@ io.on('connection', (socket: Socket) => {
   socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
   socket.emit("updateImages", allImages)
 
-  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string) => {
+  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string) => {
     console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId}`)
     const images = allImages[imageSet]
     data[roomId] = {
-      rule: '',
+      rule: rule,
       roundDuration: roundDuration,
       creator: pseudo,
       hasStarted: false,
@@ -123,12 +123,18 @@ io.on('connection', (socket: Socket) => {
     io.in(roomId).emit('updateRoomData', data[roomId])
   })
 
+  socket.on('endGame', (roomId: string) => {
+    console.log(`The creator ended the game in room ${roomId}`)
+    data[roomId].hasFinished = true
+    io.in(roomId).emit('updateRoomData', data[roomId])
+  })
+
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`)
 
     // Remove the user associated to the socket from the data
-    for (const roomId in Object.keys(data)) {
-      for (const userPseudo in Object.keys(data[roomId])) {
+    for (const roomId of Object.keys(data)) {
+      for (const userPseudo of Object.keys(data[roomId].users)) {
         if (data[roomId].users[userPseudo].socketId === socket.id) {
           delete data[roomId].users[userPseudo]
           io.in(roomId).emit('updateRoomData', data[roomId])
@@ -170,7 +176,7 @@ function startNewRound(roomId: string) {
 }
 
 setInterval(function(){
-  for (const roomId in data) {
+  for (const roomId of Object.keys(data)) {
     if (data[roomId].hasStarted && !data[roomId].hasFinished) {
       data[roomId].timer--
       if (Object.values(data[roomId].users).map(user => user.vote).every(vote => vote !== null)) {

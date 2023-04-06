@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack} from '@mui/material'
+import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack, IconButton} from '@mui/material'
 import { Socket } from 'socket.io-client'
-import { ExpandMoreOutlined } from '@mui/icons-material'
+import { ExpandMoreOutlined, FileDownloadOutlined } from '@mui/icons-material'
 
 function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoom}: {socket: Socket, callbackPseudoChange: (e: React.ChangeEvent<HTMLInputElement>) => void, callbackRoomChange: (e: React.ChangeEvent<HTMLInputElement>) => void, callbackJoinRoom: (room: string) => void}) {
     const [rooms, setRooms] = useState<string[]>([])
@@ -47,6 +47,20 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
         }
     }
 
+    const downloadImages = (newRoomImageSet: string) => {
+        fetch('/images_to_download/' + newRoomImageSet + '.zip').then(response => {
+            response.blob().then(blob => {
+                // Creating new object of PDF file
+                const fileURL = window.URL.createObjectURL(blob)
+                // Setting various property values
+                let alink = document.createElement('a')
+                alink.href = fileURL
+                alink.download = 'images.zip'
+                alink.click()
+            })
+        })
+    }
+
     useEffect(()=>{
         socket.on('updateRooms', (rooms: string[]) => {
             setRooms(rooms)
@@ -56,9 +70,9 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
             setAllImages(allImages)
         })
     },[socket])
-    
+
     return (
-    <Grid container justifyContent="space-evenly" alignItems="center" spacing={2}>
+    <Grid container justifyContent="space-evenly" alignItems="flex-start" alignContent="flex-start" spacing={5}>
         <Grid item textAlign="center" xs={12}>
             <Typography variant="h3">ELEUS-IA</Typography>
             <Typography variant="h5">Qui sera la meilleure IA ?</Typography>
@@ -77,7 +91,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                 <Button variant="contained" disabled={pseudo.length === 0 || room.length === 0} onClick={handleClickJoinRoom}>Rejoindre</Button>
             </Grid>
         </Grid>
-        <Grid container item alignItems="flex-start" justifyContent="center" xs={6}>
+        <Grid item xs={6}>
             <Accordion sx={{width: '75%'}}>
                 <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{backgroundColor: 'lightblue'}} aria-controls="panel1a-content" id="panel1a-header" >
                     <Typography variant="h6">Créer une nouvelle room</Typography>
@@ -86,18 +100,21 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                     <Stack spacing={2}>
                         <TextField id="outlined-basic" label="Room code" value={newRoom} onChange={(e) => setNewRoom(e.target.value)} variant="outlined" fullWidth />
                         <TextField id="outlined-basic" label="Durée d'un round (s)" type='number' value={newRoomRoundDuration} onChange={(e) => setNewRoomRoundDuration(parseInt(e.target.value))} variant="outlined" error={newRoomRoundDuration <= 0} fullWidth/>
-                        <Select
-                            labelId="demo-simple-select-label"
-                            id="demo-simple-select"
-                            value={newRoomImageSet}
-                            displayEmpty
-                            fullWidth
-                            onChange={(e) => setNewRoomImageSet(e.target.value)}
-                        >
-                            <MenuItem value={''} selected>Sélectionne un ensemble d'images</MenuItem>
-                            <MenuItem value={'cards'}>Cartes</MenuItem>
-                            <MenuItem value={'abstract'}>Art abstrait</MenuItem>
-                        </Select>
+                        <Stack direction="row" justifyContent="space-between" spacing={2}>
+                            <Select
+                                labelId="demo-simple-select-label"
+                                id="demo-simple-select"
+                                value={newRoomImageSet}
+                                displayEmpty
+                                fullWidth
+                                onChange={(e) => setNewRoomImageSet(e.target.value)}
+                            >
+                                <MenuItem value={''} selected>Sélectionne un ensemble d'images</MenuItem>
+                                <MenuItem value={'cards'}>Cartes</MenuItem>
+                                <MenuItem value={'abstract'}>Art abstrait</MenuItem>
+                            </Select>
+                            <IconButton color="primary" onClick={() => downloadImages(newRoomImageSet)} disabled={newRoomImageSet.length === 0}><FileDownloadOutlined /></IconButton>
+                        </Stack>
                         <Box sx={{maxHeight: 200, overflow: 'auto'}}>
                             <ImageList variant="masonry" cols={8}>
                                 {selectedImages.slice(0, 50).map((item: string) => (

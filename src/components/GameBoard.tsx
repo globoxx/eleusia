@@ -1,4 +1,4 @@
-import { Box, Grid, Slider, Typography } from '@mui/material';
+import { Box, Grid, Slider, Stack, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
 import Image from 'mui-image'
 import React, { useState } from 'react';
@@ -9,6 +9,7 @@ import ImagesContainer from './ImagesContainer';
 import UsersTable from './UsersTable';
 import PointsModal from './PointsModal';
 import Timer from './Timer';
+import EndOfGameModal from './EndOfGameModal';
 
 const minPlayers = 1
 
@@ -45,13 +46,18 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
     const [refusedImages, setRefusedImages] = useState<string[]>([])
     const [vote, setVote] = useState<number>(0)
 
-    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isPointsModalOpen, setIsPointsModalOpen] = useState(false)
     const [modalPoints, setModalPoints] = useState(0)
+    //const [isEndOfGameModalOpen, setIsEndOfGameModalOpen] = useState(false)
 
     const isRoomCreator = roomData ? pseudo === roomData.creator : false
 
     const handleClickStartGame = () => {
         socket.emit('startGame', room)
+    }
+
+    const handleClickRevealRule = () => {
+        socket.emit('endGame', room)
     }
 
     const handleDecisionChange = (_event: any, newValue: number | number[]) => {
@@ -64,10 +70,6 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
     const handleClickVote = (vote: number) => {
         socket.emit('vote', room, pseudo, vote);
         setVotingDisabled(true)
-    }
-
-    const handleModalClose = () => {
-        setIsModalOpen(false)
     }
 
     useEffect(()=>{
@@ -102,18 +104,18 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
             
             if (!isRoomCreator) {
                 setModalPoints(usersPoints[pseudo])
-                setIsModalOpen(true)
+                setIsPointsModalOpen(true)
             }
         })
     },[acceptedImages, currentImage, isRoomCreator, pseudo, refusedImages, socket, waitOnCreator])
 
     return (
         <>
-        <Grid container justifyContent="space-evenly" alignItems="center" spacing={2}>
+        <Grid container justifyContent="space-evenly" alignContent="flex-start" alignItems="center" spacing={2}>
             <Grid item textAlign="center" xs={12}>
                 <Typography variant="h3">Room {room}</Typography>
             </Grid>
-            <Grid container item alignItems="center" justifyContent="center" xs={12}>
+            <Grid item xs={12}>
                 <Timer key={timerKey} roundDuration={roomData.roundDuration} isPlaying={roomData.hasStarted} />
             </Grid>
             <Grid container item textAlign="center" xs={8} spacing={2}>
@@ -150,28 +152,33 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
                         )
                         : (
                             <>
-                                <Grid container item alignItems="center" justifyContent="center" xs={12}>
-                                    <Box width={1/3}>
-                                        <Slider defaultValue={0} aria-label="Default" valueLabelDisplay="auto" step={0.1} min={-1} max={1} marks={marks} onChange={handleDecisionChange} />
-                                    </Box>
-                                </Grid><Grid item textAlign="center" xs={12}>
+                                <Grid item textAlign="center" xs={12}>
+                                    <Slider sx={{ width: 1/3 }}defaultValue={0} aria-label="Default" valueLabelDisplay="auto" step={0.1} min={-1} max={1} marks={marks} onChange={handleDecisionChange} />
+                                </Grid>
+                                <Grid item textAlign="center" xs={12}>
                                     <Button variant="contained" onClick={() => handleClickVote(vote)} disabled={votingDisabled || timer <= 0}>Confirmer</Button>
                                 </Grid>
                             </>
                         )}
                 </Grid>
             </Grid>
-            <Grid container direction="column" alignItems="center" justifyContent="flex-start" xs={4}>
-                {!isRoomCreator && <Typography variant="h6">{roomData ? roomData.users[pseudo].score : 0}</Typography>}
-                <Box sx={{ border: 1, m: 5 }}>
-                    {roomData ? <UsersTable roomData={roomData} /> : null}
-                </Box>
-                {isRoomCreator && !roomData.hasStarted ?
-                    <Button variant="contained" onClick={handleClickStartGame} disabled={Object.keys(roomData.users).length < minPlayers}>Démarrer la partie</Button>
-                    : null}
+            <Grid item alignSelf="flex-start" xs={4}>
+                <Stack alignItems="center" justifyContent="flex-start" spacing={2}>
+                    {!isRoomCreator && <Typography variant="h6">{'Score: ' + (roomData ? roomData.users[pseudo].score : 0)}</Typography>}
+                    <Box sx={{ border: 1, m: 5, marginBottom: 2 }}>
+                        {roomData ? <UsersTable roomData={roomData} /> : null}
+                    </Box>
+                    {isRoomCreator && !roomData.hasStarted ?
+                        <Button variant="contained" onClick={handleClickStartGame} disabled={Object.keys(roomData.users).length < minPlayers}>Démarrer la partie</Button>
+                        : null}
+                    {isRoomCreator && roomData.hasStarted && !roomData.hasFinished ?
+                        <Button variant="contained" color="error" onClick={handleClickRevealRule}>Révéler la règle</Button>
+                        : null}
+                </Stack>
             </Grid>
         </Grid>
-        <PointsModal open={isModalOpen} handleClose={handleModalClose} points={modalPoints} />
+        <PointsModal open={isPointsModalOpen} handleClose={() => setIsPointsModalOpen(false)} points={modalPoints} />
+        <EndOfGameModal open={roomData.hasFinished} rule={roomData.rule} />
         </>
     )
 }
