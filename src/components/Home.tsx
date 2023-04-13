@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack, IconButton, Tooltip, Divider} from '@mui/material'
+import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack, IconButton, Tooltip } from '@mui/material'
 import { Socket } from 'socket.io-client'
 import { ExpandMoreOutlined, FileDownloadOutlined } from '@mui/icons-material'
 
@@ -112,6 +112,8 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                                 <MenuItem value={''} selected>Sélectionne un ensemble d'images</MenuItem>
                                 <MenuItem value={'cards'}>Cartes</MenuItem>
                                 <MenuItem value={'abstract'}>Art abstrait</MenuItem>
+                                <MenuItem value={'shapes'}>Formes</MenuItem>
+                                <MenuItem value={'words'}>Mots</MenuItem>
                             </Select>
                             <Tooltip title="Télécharger">
                                 <IconButton color="primary" onClick={() => downloadImages(newRoomImageSet)} disabled={newRoomImageSet.length === 0}><FileDownloadOutlined /></IconButton>
