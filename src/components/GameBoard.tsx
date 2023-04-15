@@ -48,9 +48,9 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
 
     const [isPointsModalOpen, setIsPointsModalOpen] = useState(false)
     const [modalPoints, setModalPoints] = useState(0)
-    //const [isEndOfGameModalOpen, setIsEndOfGameModalOpen] = useState(false)
 
     const isRoomCreator = roomData ? pseudo === roomData.creator : false
+    const isAutoRun = roomData ? roomData.autoRun : false
 
     const handleClickStartGame = () => {
         socket.emit('startGame', room)
@@ -138,14 +138,21 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
                 <Grid container item textAlign="center" alignItems="center" xs={12}>
                     {isRoomCreator
                         ? (
-                            <>
-                                <Grid item textAlign="center" xs={6}>
-                                    <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>Refuser</Button>
-                                </Grid>
-                                <Grid item textAlign="center" xs={6}>
-                                    <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>Accepter</Button>
-                                </Grid>
-                            </>
+                            isAutoRun
+                                ? (
+                                    <Grid item textAlign="center" xs={12}>
+                                        <Typography>Les labels sont déjà prêts !</Typography>
+                                    </Grid>
+                                )
+                                : (
+                                    <>
+                                        <Grid item textAlign="center" xs={6}>
+                                            <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>Refuser</Button>
+                                        </Grid><Grid item textAlign="center" xs={6}>
+                                            <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>Accepter</Button>
+                                        </Grid>
+                                    </>
+                                )
                         )
                         : (
                             <>
@@ -156,7 +163,8 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
                                     <Button variant="contained" onClick={() => handleClickVote(vote)} disabled={votingDisabled || timer <= 0}>Confirmer</Button>
                                 </Grid>
                             </>
-                        )}
+                        )
+                    }
                 </Grid>
             </Grid>
             <Grid item alignSelf="flex-start" xs={4}>

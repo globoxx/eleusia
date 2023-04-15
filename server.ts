@@ -36,10 +36,14 @@ export interface RoomData {
   rule: string,
   roundDuration: number,
   creator: string,
+  autoRun: boolean,
+  refusedImages: string[],
+  acceptedImages: string[],
   hasStarted: boolean,
   hasFinished: boolean,
   timer: number,
   images: string[]
+  currentImage: string | null,
   users: Users
 }
 
@@ -62,17 +66,21 @@ io.on('connection', (socket: Socket) => {
   socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
   socket.emit("updateImages", allImages)
 
-  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string) => {
-    console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId}`)
+  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, left: string[], right: string[]) => {
+    console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId} with autorun: ${autoRun}`)
     const images = allImages[imageSet]
     data[roomId] = {
       rule: rule,
       roundDuration: roundDuration,
       creator: pseudo,
+      autoRun: autoRun,
+      refusedImages: left,
+      acceptedImages: right,
       hasStarted: false,
       hasFinished: false,
       timer: roundDuration,
       images: images,
+      currentImage: null,
       users: {
         [pseudo]: {
           socketId: socket.id,
@@ -138,7 +146,7 @@ io.on('connection', (socket: Socket) => {
         if (data[roomId].users[userPseudo].socketId === socket.id) {
           delete data[roomId].users[userPseudo]
           io.in(roomId).emit('updateRoomData', data[roomId])
-          if (userPseudo === data[roomId].creator) {
+          if (userPseudo === data[roomId].creator && !data[roomId].autoRun) {
             // The creator of the room left
             data[roomId].hasFinished = true
           }
@@ -154,6 +162,7 @@ function startNewRound(roomId: string) {
   if (room_images.length > 0) {
     console.log(`New round in room ${roomId}.`)
     const random_image = room_images[Math.floor(Math.random() * room_images.length)]
+    data[roomId].currentImage = random_image
 
     // Remove the image from the list
     data[roomId].images = data[roomId].images.filter(img => img !== random_image)
@@ -184,7 +193,19 @@ setInterval(function(){
       }
       if (data[roomId].timer <= 0) {
         const creator = data[roomId].creator
-        const creatorVote = data[roomId].users[creator].vote
+        let creatorVote: number | null = null
+        if (data[roomId].autoRun) {
+          const currentImage = data[roomId].currentImage
+          console.log(currentImage)
+          console.log(data[roomId].acceptedImages)
+          if (currentImage) {
+            creatorVote = data[roomId].acceptedImages.includes(currentImage) ? 1 : -1
+          } else {
+            console.log('CURRENT IMAGE IS NULL')
+          }
+        } else {
+          creatorVote = data[roomId].users[creator].vote
+        }
         if (creatorVote != null) {
           const usersPoints: {[pseudo: string]: number} = {}
           for (const userPseudo of Object.keys(data[roomId].users)) {

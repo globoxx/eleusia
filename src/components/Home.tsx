@@ -1,19 +1,24 @@
-import React, { useEffect, useState } from 'react'
-import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack, IconButton, Tooltip } from '@mui/material'
+import React, { useCallback, useEffect, useState } from 'react'
+import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack, IconButton, Tooltip, Switch, FormControlLabel } from '@mui/material'
 import { Socket } from 'socket.io-client'
 import { ExpandMoreOutlined, FileDownloadOutlined } from '@mui/icons-material'
+import TransferImage from './TransferImage'
 
 function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoom}: {socket: Socket, callbackPseudoChange: (e: React.ChangeEvent<HTMLInputElement>) => void, callbackRoomChange: (e: React.ChangeEvent<HTMLInputElement>) => void, callbackJoinRoom: (room: string) => void}) {
     const [rooms, setRooms] = useState<string[]>([])
     const [pseudo, setPseudo] = useState('')
     const [room, setRoom] = useState('')
+    
 
     const [allImages, setAllImages] = useState<{[folder: string]: string[]}>({})
+    const [left, setLeft] = useState<string[]>([])
+    const [right, setRight] = useState<string[]>([])
 
     const [newRoom, setNewRoom] = useState('')
     const [newRoomRoundDuration, setNewRoomRoundDuration] = useState(10)
     const [newRoomImageSet, setNewRoomImageSet] = useState('')
     const [newRoomRule, setNewRoomRule] = useState('')
+    const [switchChecked, setSwitchChecked] = useState(false)
 
     const selectedImages = newRoomImageSet && allImages[newRoomImageSet] ? allImages[newRoomImageSet] : []
 
@@ -25,6 +30,15 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
         callbackRoomChange(e)
         setRoom(e.target.value)
     }
+
+    const handleSwitchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setSwitchChecked(event.target.checked)
+    }
+
+    const callbackLabels = useCallback((newLeft: string[], newRight: string[]) => {
+        setLeft(newLeft)
+        setRight(newRight)
+    }, [])
 
     const handleClickJoinRoom = () => {
         if (pseudo && room) {
@@ -40,8 +54,10 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
     }
     const handleClickCreateRoom = () => {
         if (pseudo) {
-          socket.emit('createRoom', pseudo, newRoom, newRoomRoundDuration, newRoomImageSet, newRoomRule)
-          callbackJoinRoom(newRoom)
+          socket.emit('createRoom', pseudo, newRoom, newRoomRoundDuration, newRoomImageSet, newRoomRule, switchChecked, left, right)
+          if (!switchChecked) {
+            callbackJoinRoom(newRoom)
+          }
         } else {
           alert('Choisissez un pseudo pour rejoindre une room.');
         }
@@ -72,7 +88,7 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
     },[socket])
 
     return (
-    <Grid container justifyContent="space-evenly" alignItems="flex-start" alignContent="flex-start" spacing={5}>
+    <Grid container justifyContent="center" spacing={5}>
         <Grid item textAlign="center" xs={12}>
             <Typography variant="h3">ELEUS-IA</Typography>
             <Typography variant="h5">Qui sera la meilleure IA ?</Typography>
@@ -80,20 +96,22 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
         <Grid item textAlign="center" xs={12}>
             <TextField id="outlined-basic" label="Pseudo" value={pseudo} onChange={handlePseudoChange} variant="outlined" />
         </Grid>
-        <Grid container item direction="column" alignContent="center" alignItems="center" justifyContent="flex-start" spacing={2} xs={6}>
-            <Grid item>
-                <Typography variant="h6">Rejoindre une room</Typography>
-            </Grid>
-            <Grid item>
-                <TextField id="outlined-basic" label="Room code" value={room} onChange={handleRoomChange} variant="outlined" />
-            </Grid>
-            <Grid item>
-                <Button variant="contained" disabled={pseudo.length === 0 || room.length === 0} onClick={handleClickJoinRoom}>Rejoindre</Button>
-            </Grid>
+        <Grid item xs={6}>
+            <Accordion >
+                <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{backgroundColor: 'lightblue'}} >
+                    <Typography variant="h6">Rejoindre une room</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                    <Stack spacing={2}>
+                        <TextField id="outlined-basic" label="Room code" value={room} onChange={handleRoomChange} variant="outlined" />
+                        <Button variant="contained" disabled={pseudo.length === 0 || room.length === 0} onClick={handleClickJoinRoom}>Rejoindre</Button>
+                    </Stack>
+                </AccordionDetails>
+            </Accordion>
         </Grid>
         <Grid item xs={6}>
-            <Accordion sx={{width: '75%'}}>
-                <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{backgroundColor: 'lightblue'}} aria-controls="panel1a-content" id="panel1a-header" >
+            <Accordion >
+                <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{backgroundColor: 'lightblue'}} >
                     <Typography variant="h6">Créer une nouvelle room</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
@@ -133,8 +151,10 @@ function Home({socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoo
                                 ))}
                             </ImageList>
                         </Box>
+                        <FormControlLabel control={<Switch checked={switchChecked} onChange={handleSwitchChange} inputProps={{ 'aria-label': 'controlled' }} />} label="Préparer les labels à l'avance" />
+                        <TransferImage key={newRoomImageSet} visible={switchChecked} imagesList={selectedImages} callback={callbackLabels} />
                         <TextField id="outlined-basic" label="Règle d'acceptation" multiline value={newRoomRule} onChange={(e) => setNewRoomRule(e.target.value)} variant="outlined" fullWidth />
-                        <Button sx={{marginTop: 2}} variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0 || newRoomImageSet.length === 0 || newRoomRoundDuration <= 0 || newRoomRule.length === 0} onClick={handleClickCreateRoom}>Créer la room !</Button>
+                        <Button sx={{marginTop: 2}} variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0 || newRoomImageSet.length === 0 || newRoomRoundDuration <= 0 || newRoomRule.length === 0 || (switchChecked && (left.length === 0 || right.length === 0))} onClick={handleClickCreateRoom}>{switchChecked ? 'Préparer la room !' : 'Créer la room et superviser !'}</Button>
                     </Stack>
                 </AccordionDetails>
             </Accordion>

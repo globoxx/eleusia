@@ -35,18 +35,22 @@ io.on('connection', function (socket) {
         return !roomData.hasStarted;
     }))));
     socket.emit("updateImages", allImages);
-    socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet, rule) {
+    socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet, rule, autoRun, left, right) {
         var _a;
-        console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " created new room ").concat(roomId));
+        console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " created new room ").concat(roomId, " with autorun: ").concat(autoRun));
         var images = allImages[imageSet];
         data[roomId] = {
             rule: rule,
             roundDuration: roundDuration,
             creator: pseudo,
+            autoRun: autoRun,
+            refusedImages: left,
+            acceptedImages: right,
             hasStarted: false,
             hasFinished: false,
             timer: roundDuration,
             images: images,
+            currentImage: null,
             users: (_a = {},
                 _a[pseudo] = {
                     socketId: socket.id,
@@ -110,7 +114,7 @@ io.on('connection', function (socket) {
                 if (data[roomId].users[userPseudo].socketId === socket.id) {
                     delete data[roomId].users[userPseudo];
                     io.in(roomId).emit('updateRoomData', data[roomId]);
-                    if (userPseudo === data[roomId].creator) {
+                    if (userPseudo === data[roomId].creator && !data[roomId].autoRun) {
                         // The creator of the room left
                         data[roomId].hasFinished = true;
                     }
@@ -124,6 +128,7 @@ function startNewRound(roomId) {
     if (room_images.length > 0) {
         console.log("New round in room ".concat(roomId, "."));
         var random_image_1 = room_images[Math.floor(Math.random() * room_images.length)];
+        data[roomId].currentImage = random_image_1;
         // Remove the image from the list
         data[roomId].images = data[roomId].images.filter(function (img) { return img !== random_image_1; });
         // Emit the random image path to all clients in the room
@@ -152,7 +157,21 @@ setInterval(function () {
             }
             if (data[roomId].timer <= 0) {
                 var creator = data[roomId].creator;
-                var creatorVote = data[roomId].users[creator].vote;
+                var creatorVote = null;
+                if (data[roomId].autoRun) {
+                    var currentImage = data[roomId].currentImage;
+                    console.log(currentImage);
+                    console.log(data[roomId].acceptedImages);
+                    if (currentImage) {
+                        creatorVote = data[roomId].acceptedImages.includes(currentImage) ? 1 : -1;
+                    }
+                    else {
+                        console.log('CURRENT IMAGE IS NULL');
+                    }
+                }
+                else {
+                    creatorVote = data[roomId].users[creator].vote;
+                }
                 if (creatorVote != null) {
                     var usersPoints = {};
                     for (var _c = 0, _d = Object.keys(data[roomId].users); _c < _d.length; _c++) {
