@@ -37,6 +37,11 @@ io.on('connection', function (socket) {
     socket.emit("updateImages", allImages);
     socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet, rule, autoRun, left, right) {
         var _a;
+        if (roomId in data) {
+            console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " tried to create room ").concat(roomId, " but this room already exists !"));
+            socket.emit('roomAlreadyExists');
+            return;
+        }
         console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " created new room ").concat(roomId, " with autorun: ").concat(autoRun));
         var images = allImages[imageSet];
         data[roomId] = {
@@ -54,8 +59,9 @@ io.on('connection', function (socket) {
             users: (_a = {},
                 _a[pseudo] = {
                     socketId: socket.id,
-                    score: 0,
+                    totalScore: 0,
                     lastScore: null,
+                    allScores: [],
                     vote: null
                 },
                 _a)
@@ -70,18 +76,24 @@ io.on('connection', function (socket) {
     });
     socket.on('joinRoom', function (roomId, pseudo) {
         if (roomId in data) {
+            if (pseudo in data[roomId].users) {
+                console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " tried to join room ").concat(roomId, " but this pseudo already exists !"));
+                socket.emit('pseudoAlreadyExists');
+                return;
+            }
             console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " joined room ").concat(roomId));
             socket.join(roomId);
             data[roomId].users[pseudo] = {
                 socketId: socket.id,
-                score: 0,
+                totalScore: 0,
                 lastScore: null,
+                allScores: [],
                 vote: null
             };
             io.in(roomId).emit('updateRoomData', data[roomId]);
         }
         else {
-            console.log('ROOM NOT FOUND');
+            console.log("ROOM WITH ID ".concat(roomId, " NOT FOUND"));
         }
     });
     socket.on('startGame', function (roomId) {
@@ -104,23 +116,50 @@ io.on('connection', function (socket) {
         data[roomId].hasFinished = true;
         io.in(roomId).emit('updateRoomData', data[roomId]);
     });
+    socket.on('leaveRoom', function (roomId, pseudo) {
+        console.log("User ".concat(pseudo, " with socket id ").concat(socket.id, " left room ").concat(roomId));
+        socket.leave(roomId);
+        // Remove the user associated to the socket from the data
+        for (var _i = 0, _a = Object.keys(data); _i < _a.length; _i++) {
+            var roomId_1 = _a[_i];
+            for (var _b = 0, _c = Object.keys(data[roomId_1].users); _b < _c.length; _b++) {
+                var userPseudo = _c[_b];
+                if (userPseudo === pseudo) {
+                    delete data[roomId_1].users[userPseudo];
+                    io.in(roomId_1).emit('updateRoomData', data[roomId_1]);
+                    if (data[roomId_1].hasStarted && userPseudo === data[roomId_1].creator && !data[roomId_1].autoRun) {
+                        // The creator left the room, game over
+                        data[roomId_1].hasFinished = true;
+                    }
+                }
+            }
+        }
+        socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(function (_a) {
+            var roomData = _a[1];
+            return !roomData.hasStarted;
+        }))));
+        io.in(roomId).emit('updateRoomData', data[roomId]);
+    });
     socket.on('disconnect', function () {
         console.log("User disconnected: ".concat(socket.id));
         // Remove the user associated to the socket from the data
+        var roomIdOfUser;
         for (var _i = 0, _a = Object.keys(data); _i < _a.length; _i++) {
             var roomId = _a[_i];
             for (var _b = 0, _c = Object.keys(data[roomId].users); _b < _c.length; _b++) {
                 var userPseudo = _c[_b];
                 if (data[roomId].users[userPseudo].socketId === socket.id) {
+                    roomIdOfUser = roomId;
                     delete data[roomId].users[userPseudo];
                     io.in(roomId).emit('updateRoomData', data[roomId]);
-                    if (userPseudo === data[roomId].creator && !data[roomId].autoRun) {
-                        // The creator of the room left
+                    if (data[roomId].hasStarted && userPseudo === data[roomId].creator && !data[roomId].autoRun) {
+                        // The creator left the room, game over
                         data[roomId].hasFinished = true;
                     }
                 }
             }
         }
+        io.in(roomIdOfUser).emit('updateRoomData', data[roomIdOfUser]);
     });
 });
 function startNewRound(roomId) {
@@ -160,8 +199,6 @@ setInterval(function () {
                 var creatorVote = null;
                 if (data[roomId].autoRun) {
                     var currentImage = data[roomId].currentImage;
-                    console.log(currentImage);
-                    console.log(data[roomId].acceptedImages);
                     if (currentImage) {
                         creatorVote = data[roomId].acceptedImages.includes(currentImage) ? 1 : -1;
                     }
@@ -180,7 +217,8 @@ setInterval(function () {
                             var userVote = (_a = data[roomId].users[userPseudo].vote) !== null && _a !== void 0 ? _a : 0;
                             var points = Math.round((1 - Math.abs(creatorVote - userVote)) * 100);
                             data[roomId].users[userPseudo].lastScore = points;
-                            data[roomId].users[userPseudo].score += points;
+                            data[roomId].users[userPseudo].allScores.push(points);
+                            data[roomId].users[userPseudo].totalScore += points;
                             usersPoints[userPseudo] = points;
                         }
                     }

@@ -7,9 +7,10 @@ import { Socket } from 'socket.io-client';
 import { RoomData } from '../../server';
 import ImagesContainer from './ImagesContainer';
 import UsersTable from './UsersTable';
-import PointsModal from './PointsModal';
+import PointsModal from './Modals/PointsModal';
 import Timer from './Timer';
-import EndOfGameModal from './EndOfGameModal';
+import EndOfGameModal from './Modals/EndOfGameModal';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 const minPlayers = 1
 
@@ -33,9 +34,10 @@ type GameBoardProps = {
     pseudo: string
     room: string
     roomData: RoomData
+    callbackLeaveRoom: () => void
 }
   
-function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
+function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoardProps) {
 
     const [timer, setTimer] = useState<number>(0)
     const [timerKey, setTimerKey] = useState<number>(0)
@@ -51,6 +53,10 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
 
     const isRoomCreator = roomData ? pseudo === roomData.creator : false
     const isAutoRun = roomData ? roomData.autoRun : false
+
+    if (!(pseudo in roomData.users)) {
+        alert('Vous avez été déconnecté de la partie !')
+    }
 
     const handleClickStartGame = () => {
         socket.emit('startGame', room)
@@ -70,6 +76,11 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
     const handleClickVote = (vote: number) => {
         socket.emit('vote', room, pseudo, vote);
         setVotingDisabled(true)
+    }
+
+    const leaveRoom = () => {
+        socket.emit('leaveRoom', room, pseudo)
+        callbackLeaveRoom()
     }
 
     useEffect(()=>{
@@ -113,6 +124,9 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
         <>
         <Grid container justifyContent="space-evenly" alignContent="flex-start" alignItems="center" spacing={2}>
             <Grid item textAlign="center" xs={12}>
+                <Button variant="outlined" color="error" endIcon={<LogoutIcon />} onClick={leaveRoom} style={{ position: "absolute", left: 20 }}>
+                    Quitter la partie
+                </Button>
                 <Typography variant="h3">Room {room}</Typography>
             </Grid>
             <Grid container item textAlign="center" xs={8} spacing={2}>
@@ -141,10 +155,10 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
                             isAutoRun
                                 ? (
                                     <Grid item textAlign="center" xs={12}>
-                                        <Typography>Les labels sont déjà prêts !</Typography>
+                                        <Typography variant="h5">{roomData.hasStarted ? "Les labels sont déjà prêts !" : "Vous n'avez plus qu'à démarrer la partie quand vous êtes prêt !"}</Typography>
                                     </Grid>
                                 )
-                                : (
+                                : roomData.hasStarted && (
                                     <>
                                         <Grid item textAlign="center" xs={6}>
                                             <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>Refuser</Button>
@@ -154,25 +168,31 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
                                     </>
                                 )
                         )
-                        : (
-                            <>
+                        : roomData.hasStarted 
+                            ? (
+                                <>
+                                    <Grid item textAlign="center" xs={12}>
+                                        <Slider sx={{ width: 1/3 }}defaultValue={0} aria-label="Default" valueLabelDisplay="auto" step={0.1} min={-1} max={1} marks={marks} onChange={handleDecisionChange} />
+                                    </Grid>
+                                    <Grid item textAlign="center" xs={12}>
+                                        <Button variant="contained" onClick={() => handleClickVote(vote)} disabled={votingDisabled || timer <= 0}>Confirmer</Button>
+                                    </Grid>
+                                </>
+                            )
+                            : (
                                 <Grid item textAlign="center" xs={12}>
-                                    <Slider sx={{ width: 1/3 }}defaultValue={0} aria-label="Default" valueLabelDisplay="auto" step={0.1} min={-1} max={1} marks={marks} onChange={handleDecisionChange} />
+                                    <Typography variant="h5">Le maître du jeu n'a pas encore démarré la partie !</Typography>
                                 </Grid>
-                                <Grid item textAlign="center" xs={12}>
-                                    <Button variant="contained" onClick={() => handleClickVote(vote)} disabled={votingDisabled || timer <= 0}>Confirmer</Button>
-                                </Grid>
-                            </>
-                        )
+                            )
                     }
                 </Grid>
             </Grid>
             <Grid item alignSelf="flex-start" xs={4}>
                 <Stack alignItems="center" justifyContent="flex-start" spacing={2}>
                     <Timer key={timerKey} roundDuration={roomData.roundDuration} isPlaying={roomData.hasStarted} />
-                    {!isRoomCreator && <Typography variant="h6">{'Score: ' + (roomData ? roomData.users[pseudo].score : 0)}</Typography>}
+                    {!isRoomCreator && <Typography variant="h6">{'Score: ' + (roomData && roomData.users[pseudo] ? roomData.users[pseudo].totalScore : 0)}</Typography>}
                     <Box sx={{ border: 1, m: 5, marginBottom: 2 }}>
-                        {roomData ? <UsersTable roomData={roomData} /> : null}
+                        {roomData ? <UsersTable roomData={roomData} pseudo={pseudo} /> : null}
                     </Box>
                     {isRoomCreator && !roomData.hasStarted ?
                         <Button variant="contained" onClick={handleClickStartGame} disabled={Object.keys(roomData.users).length < minPlayers}>Démarrer la partie</Button>
@@ -183,8 +203,8 @@ function GameBoard({socket, pseudo, room, roomData}: GameBoardProps) {
                 </Stack>
             </Grid>
         </Grid>
-        <PointsModal open={isPointsModalOpen} handleClose={() => setIsPointsModalOpen(false)} points={modalPoints} />
-        <EndOfGameModal open={roomData.hasFinished} rule={roomData.rule} />
+        {!isRoomCreator && <PointsModal open={isPointsModalOpen} handleClose={() => setIsPointsModalOpen(false)} points={modalPoints} />}
+        <EndOfGameModal open={roomData.hasFinished} rule={roomData.rule} users={roomData.users} pseudo={pseudo} creatorPseudo={roomData.creator} />
         </>
     )
 }

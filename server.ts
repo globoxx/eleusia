@@ -23,8 +23,9 @@ app.get('/', function(_req, res) {
 
 export interface User {
   socketId: string,
-  score: number,
+  totalScore: number,
   lastScore: number | null,
+  allScores: number[],
   vote: number | null
 }
 
@@ -67,6 +68,11 @@ io.on('connection', (socket: Socket) => {
   socket.emit("updateImages", allImages)
 
   socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, left: string[], right: string[]) => {
+    if (roomId in data) {
+      console.log(`User ${socket.id} with pseudo ${pseudo} tried to create room ${roomId} but this room already exists !`)
+      socket.emit('roomAlreadyExists')
+      return
+    }
     console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId} with autorun: ${autoRun}`)
     const images = allImages[imageSet]
     data[roomId] = {
@@ -84,8 +90,9 @@ io.on('connection', (socket: Socket) => {
       users: {
         [pseudo]: {
           socketId: socket.id,
-          score: 0,
+          totalScore: 0,
           lastScore: null,
+          allScores: [],
           vote: null
         }
       }
@@ -101,17 +108,23 @@ io.on('connection', (socket: Socket) => {
 
   socket.on('joinRoom', (roomId: string, pseudo: string) => {
     if (roomId in data) {
+      if (pseudo in data[roomId].users) {
+        console.log(`User ${socket.id} with pseudo ${pseudo} tried to join room ${roomId} but this pseudo already exists !`)
+        socket.emit('pseudoAlreadyExists')
+        return
+      }
       console.log(`User ${socket.id} with pseudo ${pseudo} joined room ${roomId}`)
       socket.join(roomId)
       data[roomId].users[pseudo] = {
         socketId: socket.id,
-        score: 0,
+        totalScore: 0,
         lastScore: null,
+        allScores: [],
         vote: null
       }
       io.in(roomId).emit('updateRoomData', data[roomId])
     } else {
-      console.log('ROOM NOT FOUND')
+      console.log(`ROOM WITH ID ${roomId} NOT FOUND`)
     }
   })
 
@@ -137,22 +150,48 @@ io.on('connection', (socket: Socket) => {
     io.in(roomId).emit('updateRoomData', data[roomId])
   })
 
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`)
+  socket.on('leaveRoom', (roomId: string, pseudo: string) => {
+    console.log(`User ${pseudo} with socket id ${socket.id} left room ${roomId}`)
+    socket.leave(roomId)
 
     // Remove the user associated to the socket from the data
     for (const roomId of Object.keys(data)) {
       for (const userPseudo of Object.keys(data[roomId].users)) {
-        if (data[roomId].users[userPseudo].socketId === socket.id) {
+        if (userPseudo === pseudo) {
           delete data[roomId].users[userPseudo]
           io.in(roomId).emit('updateRoomData', data[roomId])
-          if (userPseudo === data[roomId].creator && !data[roomId].autoRun) {
-            // The creator of the room left
+          if (data[roomId].hasStarted && userPseudo === data[roomId].creator && !data[roomId].autoRun) {
+            // The creator left the room, game over
             data[roomId].hasFinished = true
           }
         }
       }
     }
+
+    socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
+    io.in(roomId).emit('updateRoomData', data[roomId])
+  })
+
+  socket.on('disconnect', () => {
+    console.log(`User disconnected: ${socket.id}`)
+
+    // Remove the user associated to the socket from the data
+    let roomIdOfUser
+    for (const roomId of Object.keys(data)) {
+      for (const userPseudo of Object.keys(data[roomId].users)) {
+        if (data[roomId].users[userPseudo].socketId === socket.id) {
+          roomIdOfUser = roomId
+          delete data[roomId].users[userPseudo]
+          io.in(roomId).emit('updateRoomData', data[roomId])
+          if (data[roomId].hasStarted && userPseudo === data[roomId].creator && !data[roomId].autoRun) {
+            // The creator left the room, game over
+            data[roomId].hasFinished = true
+          }
+        }
+      }
+    }
+
+    io.in(roomIdOfUser).emit('updateRoomData', data[roomIdOfUser])
   })
 })
 
@@ -196,8 +235,6 @@ setInterval(function(){
         let creatorVote: number | null = null
         if (data[roomId].autoRun) {
           const currentImage = data[roomId].currentImage
-          console.log(currentImage)
-          console.log(data[roomId].acceptedImages)
           if (currentImage) {
             creatorVote = data[roomId].acceptedImages.includes(currentImage) ? 1 : -1
           } else {
@@ -213,7 +250,8 @@ setInterval(function(){
               const userVote = data[roomId].users[userPseudo].vote ?? 0
               const points = Math.round((1 - Math.abs(creatorVote - userVote)) * 100)
               data[roomId].users[userPseudo].lastScore = points
-              data[roomId].users[userPseudo].score += points
+              data[roomId].users[userPseudo].allScores.push(points)
+              data[roomId].users[userPseudo].totalScore += points
               usersPoints[userPseudo] = points
             }
           }

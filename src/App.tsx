@@ -30,11 +30,15 @@ function App() {
     setRoom(room)
     setIsInGame(true)
   }
+  const callbackLeaveRoom = () => {
+    setRoom('')
+    setIsInGame(false)
+  }
 
   return (
     <Box padding={2}>
       {isInGame && roomData
-        ? <GameBoard socket={socket} pseudo={pseudo} room={room} roomData={roomData} />
+        ? <GameBoard socket={socket} pseudo={pseudo} room={room} roomData={roomData} callbackLeaveRoom={callbackLeaveRoom} />
         : <Home socket={socket} callbackPseudoChange={callbackPseudoChange} callbackRoomChange={callbackRoomChange} callbackJoinRoom={callbackJoinRoom} />
       }
     </Box>

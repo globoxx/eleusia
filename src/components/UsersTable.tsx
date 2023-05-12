@@ -9,7 +9,7 @@ import Paper from '@mui/material/Paper';
 import { User, RoomData } from '../../server';
 import { TableFooter, Typography } from '@mui/material';
 
-function UsersTable({roomData}: {roomData: RoomData}) {
+function UsersTable({roomData, pseudo}: {roomData: RoomData, pseudo: string}) {
     return (
         <TableContainer component={Paper}>
             <Table aria-label="simple table">
@@ -21,15 +21,15 @@ function UsersTable({roomData}: {roomData: RoomData}) {
                     </TableRow>
                 </TableHead>
                 <TableBody>
-                {Object.entries(roomData.users).sort(([, user]: [string, User]) => -user.score).map(([pseudo, user]: [string, User]) => (
-                    (pseudo !== roomData.creator) && (
+                {Object.entries(roomData.users).sort(([, user]: [string, User]) => -user.totalScore).map(([linePseudo, user]: [string, User]) => (
+                    (linePseudo !== roomData.creator) && (
                         <TableRow
-                            key={pseudo}
-                            sx={{ '&:last-child td, &:last-child th': { border: 0, color: (user.vote ? 'green' : 'red') } }}
+                            key={linePseudo}
+                            sx={{ '&:last-child td, &:last-child th': { border: 0 }, backgroundColor: pseudo === linePseudo ? '#e0e0e0' : undefined }}
                         >
-                            <TableCell component="th" scope="row">{pseudo}</TableCell>
+                            <TableCell component="th" scope="row">{linePseudo}</TableCell>
                             <TableCell align="center">{user.lastScore ?? '-'}</TableCell>
-                            <TableCell align="center">{user.score}</TableCell>
+                            <TableCell align="center">{user.totalScore}</TableCell>
                         </TableRow>
                     )
                 ))}
