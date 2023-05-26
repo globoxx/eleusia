@@ -11,6 +11,8 @@ import PointsModal from './Modals/PointsModal';
 import Timer from './Timer';
 import EndOfGameModal from './Modals/EndOfGameModal';
 import LogoutIcon from '@mui/icons-material/Logout';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayCircleFilledIcon from '@mui/icons-material/PlayCircleFilled';
 
 const minPlayers = 1
 
@@ -66,6 +68,10 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
         socket.emit('endGame', room)
     }
 
+    const handleClickPause = () => {
+        socket.emit('pause', room)
+    }
+
     const handleDecisionChange = (_event: any, newValue: number | number[]) => {
         setVote(newValue as number)
     }
@@ -74,7 +80,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
     const handleClickRefuse = () => handleClickVote(-1)
 
     const handleClickVote = (vote: number) => {
-        socket.emit('vote', room, pseudo, vote);
+        socket.emit('vote', room, pseudo, vote)
         setVotingDisabled(true)
     }
 
@@ -189,7 +195,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
             </Grid>
             <Grid item alignSelf="flex-start" xs={4}>
                 <Stack alignItems="center" justifyContent="flex-start" spacing={2}>
-                    <Timer key={timerKey} roundDuration={roomData.roundDuration} isPlaying={roomData.hasStarted} />
+                    <Timer key={timerKey} roundDuration={roomData.roundDuration} isPlaying={roomData.hasStarted && !roomData.hasFinished && !roomData.paused} />
                     {!isRoomCreator && <Typography variant="h6">{'Score: ' + (roomData && roomData.users[pseudo] ? roomData.users[pseudo].totalScore : 0)}</Typography>}
                     <Box sx={{ border: 1, m: 5, marginBottom: 2 }}>
                         {roomData ? <UsersTable roomData={roomData} pseudo={pseudo} /> : null}
@@ -198,7 +204,10 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                         <Button variant="contained" onClick={handleClickStartGame} disabled={Object.keys(roomData.users).length < minPlayers}>Démarrer la partie</Button>
                         : null}
                     {isRoomCreator && roomData.hasStarted && !roomData.hasFinished ?
-                        <Button variant="contained" color="error" onClick={handleClickRevealRule}>Révéler la règle</Button>
+                        <Stack direction="row" spacing={2}>
+                            <Button startIcon={!roomData.paused ? <PauseIcon/> : <PlayCircleFilledIcon/>} variant="outlined" onClick={handleClickPause}>{!roomData.paused ? "Pause" : "Reprendre"}</Button>
+                            <Button variant="contained" color="error" onClick={handleClickRevealRule}>Révéler la règle</Button>
+                        </Stack>
                         : null}
                 </Stack>
             </Grid>

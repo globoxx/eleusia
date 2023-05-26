@@ -158,8 +158,10 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                                 >
                                     <MenuItem value={''} selected>Sélectionne un ensemble d'images</MenuItem>
                                     <MenuItem value={'cards'}>Cartes</MenuItem>
-                                    <MenuItem value={'abstract'}>Art abstrait</MenuItem>
                                     <MenuItem value={'shapes'}>Formes</MenuItem>
+                                    <MenuItem value={'faces'}>Visages</MenuItem>
+                                    <MenuItem value={'cars'}>Voitures</MenuItem>
+                                    <MenuItem value={'abstract'}>Art abstrait</MenuItem>
                                     <MenuItem value={'words'}>Mots</MenuItem>
                                 </Select>
                                 <Tooltip title="Télécharger">

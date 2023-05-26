@@ -38,6 +38,7 @@ export interface RoomData {
   roundDuration: number,
   creator: string,
   autoRun: boolean,
+  paused: boolean,
   refusedImages: string[],
   acceptedImages: string[],
   hasStarted: boolean,
@@ -80,6 +81,7 @@ io.on('connection', (socket: Socket) => {
       roundDuration: roundDuration,
       creator: pseudo,
       autoRun: autoRun,
+      paused: false,
       refusedImages: left,
       acceptedImages: right,
       hasStarted: false,
@@ -172,6 +174,17 @@ io.on('connection', (socket: Socket) => {
     io.in(roomId).emit('updateRoomData', data[roomId])
   })
 
+  socket.on('pause', (roomId: string) => {
+    if (!data[roomId].paused) {
+      console.log(`The room ${roomId} is posed`)
+    } else {
+      console.log(`The room ${roomId} resumes`)
+    }
+    
+    data[roomId].paused = !data[roomId].paused
+    io.in(roomId).emit('updateRoomData', data[roomId])
+  })
+
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`)
 
@@ -225,7 +238,7 @@ function startNewRound(roomId: string) {
 
 setInterval(function(){
   for (const roomId of Object.keys(data)) {
-    if (data[roomId].hasStarted && !data[roomId].hasFinished) {
+    if (data[roomId].hasStarted && !data[roomId].hasFinished && !data[roomId].paused) {
       data[roomId].timer--
       if (Object.values(data[roomId].users).map(user => user.vote).every(vote => vote !== null)) {
         data[roomId].timer = 0
