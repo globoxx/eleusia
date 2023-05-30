@@ -49,7 +49,7 @@ io.on('connection', function (socket) {
             roundDuration: roundDuration,
             creator: pseudo,
             autoRun: autoRun,
-            break: false,
+            paused: false,
             refusedImages: left,
             acceptedImages: right,
             hasStarted: false,
@@ -141,14 +141,14 @@ io.on('connection', function (socket) {
         }))));
         io.in(roomId).emit('updateRoomData', data[roomId]);
     });
-    socket.on('break', function (roomId) {
-        if (!data[roomId].break) {
-            console.log("The room ".concat(roomId, " is on break"));
+    socket.on('pause', function (roomId) {
+        if (!data[roomId].paused) {
+            console.log("The room ".concat(roomId, " is posed"));
         }
         else {
             console.log("The room ".concat(roomId, " resumes"));
         }
-        data[roomId].break = !data[roomId].break;
+        data[roomId].paused = !data[roomId].paused;
         io.in(roomId).emit('updateRoomData', data[roomId]);
     });
     socket.on('disconnect', function () {
@@ -200,7 +200,7 @@ setInterval(function () {
     var _a;
     for (var _i = 0, _b = Object.keys(data); _i < _b.length; _i++) {
         var roomId = _b[_i];
-        if (data[roomId].hasStarted && !data[roomId].hasFinished && !data[roomId].break) {
+        if (data[roomId].hasStarted && !data[roomId].hasFinished && !data[roomId].paused) {
             data[roomId].timer--;
             if (Object.values(data[roomId].users).map(function (user) { return user.vote; }).every(function (vote) { return vote !== null; })) {
                 data[roomId].timer = 0;
