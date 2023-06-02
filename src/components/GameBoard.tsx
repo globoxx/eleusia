@@ -123,23 +123,17 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
         callbackLeaveRoom()
     }
 
-    useEffect(()=>{
+    useEffect(() => {
         if (isRoomCreator) {
             initializeModel()
             .then(() => console.log('Model initialized'))
             .catch((error) => console.error('Error initializing model:', error));
         }
+    }, [isRoomCreator])
 
-        socket.on('timer', (timer: number) => {
-            if (!waitOnCreator) {
-                setTimer(timer)
-            }
-        })
-    
-        socket.on('newRound', (image: string) => {
+    useEffect(() => {
+        const onNewRound = (image: string) => {
             setCurrentImage(image)
-
-            console.log(acceptedImages)
 
             if (isRoomCreator) {
                 let trainingImages = acceptedImages.concat(refusedImages)
@@ -157,15 +151,32 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
             setWaitOnCreator(false)
 
             setTimerKey(prevTimerKey => prevTimerKey + 1)
-        })
+        }
 
-        socket.on('waitCreator', () => {
+        socket.on('newRound', onNewRound)
+        return () => {socket.off('newRound', onNewRound)}
+    }, [acceptedImages, isRoomCreator, refusedImages, socket])
+
+    useEffect(() => {
+        const onTimer = (timer: number) => {
+            if (!waitOnCreator) {
+                setTimer(timer)
+            }
+        }
+        socket.on('timer', onTimer)
+        return () => {socket.off('timer', onTimer)}
+    }, [socket, waitOnCreator])
+
+    useEffect(() => {
+        const onWaitCreator = () => {
             setWaitOnCreator(true)
-        })
+        }
+        socket.on('waitCreator', onWaitCreator)
+        return () => {socket.off('waitCreator', onWaitCreator)}
+    }, [socket])
 
-        socket.on('endOfRound', (usersPoints: {[pseudo: string]: number}, creatorVote: number) => {
-            console.log('end of round')
-            console.log(currentImage)
+    useEffect(()=>{
+        const onEndOfRound = (usersPoints: {[pseudo: string]: number}, creatorVote: number) => {
             if (creatorVote > 0) {
                 setAcceptedImages([...acceptedImages, currentImage])
             } else {
@@ -178,8 +189,10 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                 setModalPoints(usersPoints[pseudo])
                 setIsPointsModalOpen(true)
             }
-        })
-    }, [socket, currentImage])
+        }
+        socket.on('endOfRound', onEndOfRound)
+        return () => {socket.off('endOfRound', onEndOfRound)}
+    }, [acceptedImages, currentImage, isRoomCreator, pseudo, refusedImages, socket])
 
     return (
         <>
