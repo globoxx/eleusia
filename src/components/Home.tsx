@@ -20,7 +20,8 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
     const [newRoomRoundDuration, setNewRoomRoundDuration] = useState('')
     const [newRoomImageSet, setNewRoomImageSet] = useState('')
     const [newRoomRule, setNewRoomRule] = useState('')
-    const [switchChecked, setSwitchChecked] = useState(false)
+    const [labelsSwitchChecked, setLabelsSwitchChecked] = useState(false)
+    const [AISwitchChecked, setAISwitchChecked] = useState(false)
 
     const [isRulesModalOpen, setIsRulesModalOpen] = useState(false)
 
@@ -35,8 +36,12 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
         setRoom(e.target.value)
     }
 
-    const handleSwitchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setSwitchChecked(event.target.checked)
+    const handleLabelsSwitchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setLabelsSwitchChecked(event.target.checked)
+    }
+
+    const handleAISwitchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setAISwitchChecked(event.target.checked)
     }
 
     const callbackLabels = useCallback((newLeft: string[], newRight: string[]) => {
@@ -58,7 +63,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
     }
     const handleClickCreateRoom = () => {
         if (pseudo) {
-            socket.emit('createRoom', pseudo, newRoom, parseInt(newRoomRoundDuration), newRoomImageSet, newRoomRule, switchChecked, left, right)
+            socket.emit('createRoom', pseudo, newRoom, parseInt(newRoomRoundDuration), newRoomImageSet, newRoomRule, labelsSwitchChecked, AISwitchChecked, left, right)
             callbackJoinRoom(newRoom)
         } else {
             alert('Choisissez un pseudo pour rejoindre une room.');
@@ -182,12 +187,16 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                                 </ImageList>
                             </Box>
                             <Stack direction="row" alignItems="center">
-                                <FormControlLabel control={<Switch checked={switchChecked} onChange={handleSwitchChange} inputProps={{ 'aria-label': 'controlled' }} />} label="Préparer les labels à l'avance" />
+                                <FormControlLabel control={<Switch checked={labelsSwitchChecked} onChange={handleLabelsSwitchChange} inputProps={{ 'aria-label': 'controlled' }} />} label="Préparer les labels à l'avance" />
                                 <HelpTooltip title="Cocher cette option permet de définir les labels à l'avance. Cela vous permet de ne pas avoir à catégoriser les images en cours de partie." />
                             </Stack>
-                            <TransferImage key={newRoomImageSet} visible={switchChecked} imagesList={selectedImages} callback={callbackLabels} />
+                            <TransferImage key={newRoomImageSet} visible={labelsSwitchChecked} imagesList={selectedImages} callback={callbackLabels} />
                             <TextField required label="Règle d'acceptation" multiline value={newRoomRule} onChange={(e) => setNewRoomRule(e.target.value)} variant="outlined" fullWidth />
-                            <Button sx={{ marginTop: 2 }} variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0 || newRoomImageSet.length === 0 || newRoomRoundDuration.length === 0 || newRoomRule.length === 0 || (switchChecked && (left.length === 0 || right.length === 0))} onClick={handleClickCreateRoom}>{switchChecked ? 'Préparer la room !' : 'Créer la room et superviser !'}</Button>
+                            <Stack direction="row" alignItems="center">
+                                <FormControlLabel control={<Switch checked={AISwitchChecked} onChange={handleAISwitchChange} inputProps={{ 'aria-label': 'controlled' }} />} label="Ajouter une IA comme joueur (beta)" />
+                                <HelpTooltip title="Cocher cette option va ajouter une IA à la liste des joueurs. Elle va s'entraîner à chaque image et faire ses prédictions comme tout autre joueur. Plus d'informations dans les règles du jeu." />
+                            </Stack>
+                            <Button sx={{ marginTop: 2 }} variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0 || newRoomImageSet.length === 0 || newRoomRoundDuration.length === 0 || newRoomRule.length === 0 || (labelsSwitchChecked && (left.length === 0 || right.length === 0))} onClick={handleClickCreateRoom}>{labelsSwitchChecked ? 'Préparer la room !' : 'Créer la room et superviser !'}</Button>
                         </Stack>
                     </AccordionDetails>
                 </Accordion>

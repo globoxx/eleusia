@@ -1,4 +1,15 @@
 "use strict";
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 var express = require("express");
 var cors = require("cors");
@@ -35,7 +46,7 @@ io.on('connection', function (socket) {
         return !roomData.hasStarted;
     }))));
     socket.emit("updateImages", allImages);
-    socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet, rule, autoRun, left, right) {
+    socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet, rule, autoRun, hasAI, left, right) {
         var _a;
         if (roomId in data) {
             console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " tried to create room ").concat(roomId, " but this room already exists !"));
@@ -49,6 +60,7 @@ io.on('connection', function (socket) {
             roundDuration: roundDuration,
             creator: pseudo,
             autoRun: autoRun,
+            hasAI: hasAI,
             paused: false,
             refusedImages: left,
             acceptedImages: right,
@@ -57,22 +69,19 @@ io.on('connection', function (socket) {
             timer: roundDuration,
             images: images,
             currentImage: null,
-            users: (_a = {},
-                _a[pseudo] = {
-                    socketId: socket.id,
-                    totalScore: 0,
-                    lastScore: null,
-                    allScores: [],
-                    vote: null
-                },
-                _a['Eleus-IA'] = {
+            users: __assign((_a = {}, _a[pseudo] = {
+                socketId: socket.id,
+                totalScore: 0,
+                lastScore: null,
+                allScores: [],
+                vote: null
+            }, _a), (hasAI && { 'Eleus-IA': {
                     socketId: '0',
                     totalScore: 0,
                     lastScore: null,
                     allScores: [],
                     vote: null
-                },
-                _a)
+                } }))
         };
         socket.join(roomId);
         io.in(roomId).emit('updateRoomData', data[roomId]);

@@ -38,6 +38,7 @@ export interface RoomData {
   roundDuration: number,
   creator: string,
   autoRun: boolean,
+  hasAI: boolean,
   paused: boolean,
   refusedImages: string[],
   acceptedImages: string[],
@@ -68,7 +69,7 @@ io.on('connection', (socket: Socket) => {
   socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
   socket.emit("updateImages", allImages)
 
-  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, left: string[], right: string[]) => {
+  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, hasAI: boolean, left: string[], right: string[]) => {
     if (roomId in data) {
       console.log(`User ${socket.id} with pseudo ${pseudo} tried to create room ${roomId} but this room already exists !`)
       socket.emit('roomAlreadyExists')
@@ -81,6 +82,7 @@ io.on('connection', (socket: Socket) => {
       roundDuration: roundDuration,
       creator: pseudo,
       autoRun: autoRun,
+      hasAI: hasAI,
       paused: false,
       refusedImages: left,
       acceptedImages: right,
@@ -97,13 +99,13 @@ io.on('connection', (socket: Socket) => {
           allScores: [],
           vote: null
         },
-        'Eleus-IA': {
+        ...(hasAI && {'Eleus-IA': {
           socketId: '0',
           totalScore: 0,
           lastScore: null,
           allScores: [],
           vote: null
-        }
+        }})
       }
     }
 

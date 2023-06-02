@@ -13,7 +13,7 @@ import EndOfGameModal from './Modals/EndOfGameModal';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PauseIcon from '@mui/icons-material/Pause';
 import PlayCircleFilledIcon from '@mui/icons-material/PlayCircleFilled';
-import MyModel, { ImageElement } from './AIModel';
+import MyModel from './AIModel';
 
 const minPlayers = 1
 
@@ -38,7 +38,6 @@ async function initializeModel() {
 }
 
 async function trainModel(images: string[], labels: number[]) {
-    await initializeModel()
     let imgs = await Promise.all(images.map(async image => await createImageElement(image)))
     if (MyModel.model && MyModel.featureExtractor) {
         await MyModel.trainModel(imgs, labels);
@@ -124,18 +123,18 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
     }
 
     useEffect(() => {
-        if (isRoomCreator) {
+        if (isRoomCreator && roomData.hasAI) {
             initializeModel()
             .then(() => console.log('Model initialized'))
             .catch((error) => console.error('Error initializing model:', error));
         }
-    }, [isRoomCreator])
+    }, [isRoomCreator, roomData.hasAI])
 
     useEffect(() => {
         const onNewRound = (image: string) => {
             setCurrentImage(image)
 
-            if (isRoomCreator) {
+            if (isRoomCreator && roomData.hasAI && (acceptedImages.length > 0 || refusedImages.length > 0)) {
                 let trainingImages = acceptedImages.concat(refusedImages)
                 let trainingLabels = Array(acceptedImages.length).fill(1).concat(Array(refusedImages.length).fill(0))
                 trainModel(trainingImages, trainingLabels).then(() => {
@@ -143,8 +142,9 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                 })
                 predictImage(image).then((prediction) => {
                     console.log("The prediction is " + prediction)
-                    //aiVote = prediction.argmax()[0]
-                    //socket.emit('vote', room, "Eleus-IA", vote)
+                    let aiVote = (prediction[1] - 0.5) * 2
+                    aiVote = Number(aiVote.toFixed(2))
+                    socket.emit('vote', room, "Eleus-IA", aiVote)
                 })
             }
 
@@ -157,7 +157,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
 
         socket.on('newRound', onNewRound)
         return () => {socket.off('newRound', onNewRound)}
-    }, [acceptedImages, isRoomCreator, refusedImages, socket])
+    }, [acceptedImages, isRoomCreator, refusedImages, room, roomData.hasAI, socket])
 
     useEffect(() => {
         const onTimer = (timer: number) => {
