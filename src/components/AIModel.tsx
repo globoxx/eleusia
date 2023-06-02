@@ -60,7 +60,7 @@ const MyModel = {
   predictImage: (image: ImageElement) => {
     const imageFeatures = MyModel.preprocessImage(image);
     if (MyModel.model) {
-      const predictionLabel = (MyModel.model.predict(imageFeatures.expandDims()) as tf.Tensor).squeeze().argMax().dataSync()[0];
+      const predictionLabel = (MyModel.model.predict(imageFeatures.expandDims()) as tf.Tensor).squeeze().dataSync();
       imageFeatures.dispose();
       return predictionLabel;
     }

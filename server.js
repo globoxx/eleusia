@@ -65,6 +65,13 @@ io.on('connection', function (socket) {
                     allScores: [],
                     vote: null
                 },
+                _a['Eleus-IA'] = {
+                    socketId: '0',
+                    totalScore: 0,
+                    lastScore: null,
+                    allScores: [],
+                    vote: null
+                },
                 _a)
         };
         socket.join(roomId);

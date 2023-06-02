@@ -143,6 +143,8 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                 })
                 predictImage(image).then((prediction) => {
                     console.log("The prediction is " + prediction)
+                    //aiVote = prediction.argmax()[0]
+                    //socket.emit('vote', room, "Eleus-IA", vote)
                 })
             }
 

@@ -96,6 +96,13 @@ io.on('connection', (socket: Socket) => {
           lastScore: null,
           allScores: [],
           vote: null
+        },
+        'Eleus-IA': {
+          socketId: '0',
+          totalScore: 0,
+          lastScore: null,
+          allScores: [],
+          vote: null
         }
       }
     }
