@@ -37,7 +37,7 @@ function UsersTable({roomData, pseudo}: {roomData: RoomData, pseudo: string}) {
                 <TableFooter>
                     {!roomData.hasStarted && (
                         <TableCell align="center" colSpan={3}>
-                            <Typography variant="h6">En attende de joueurs...</Typography>
+                            <Typography variant="h6">{"Nombre de joueurs: " + (Object.keys(roomData.users).length - 1)}</Typography>
                         </TableCell>
                         )
                     }
