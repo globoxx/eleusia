@@ -1,6 +1,6 @@
 import { Box, Grid, Paper, Slider, Stack, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
-import Image from 'mui-image'
+import {Image as MuiImage} from 'mui-image';
 import React, { useState } from 'react';
 import { useEffect } from 'react';
 import { Socket } from 'socket.io-client';
@@ -13,6 +13,7 @@ import EndOfGameModal from './Modals/EndOfGameModal';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PauseIcon from '@mui/icons-material/Pause';
 import PlayCircleFilledIcon from '@mui/icons-material/PlayCircleFilled';
+import MyModel, { ImageElement } from './AIModel';
 
 const minPlayers = 1
 
@@ -30,6 +31,39 @@ const marks = [
       label: 'Accepter',
     }
 ]
+
+async function initializeModel() {
+    await MyModel.loadFeatureExtractor();
+    MyModel.loadModel();
+}
+
+async function trainModel(images: string[], labels: number[]) {
+    await initializeModel()
+    let imgs = await Promise.all(images.map(async image => await createImageElement(image)))
+    if (MyModel.model && MyModel.featureExtractor) {
+        await MyModel.trainModel(imgs, labels);
+    } else {
+        throw new Error('Model or feature extractor not loaded');
+    }
+}
+
+async function predictImage(image: string) {
+    let img = await createImageElement(image)
+    if (MyModel.model && MyModel.featureExtractor) {
+        return MyModel.predictImage(img);
+    } else {
+        throw new Error('Model or feature extractor not loaded');
+    }
+}
+
+function createImageElement(imageUrl: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+        let img = new Image();
+        img.src = imageUrl;
+        img.onload = () => resolve(img);  // Resolve the promise when the image is loaded
+        img.onerror = reject;  // Reject the promise if there is an error
+    });
+}
 
 type GameBoardProps = {
     socket: Socket
@@ -90,6 +124,12 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
     }
 
     useEffect(()=>{
+        if (isRoomCreator) {
+            initializeModel()
+            .then(() => console.log('Model initialized'))
+            .catch((error) => console.error('Error initializing model:', error));
+        }
+
         socket.on('timer', (timer: number) => {
             if (!waitOnCreator) {
                 setTimer(timer)
@@ -98,6 +138,19 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
     
         socket.on('newRound', (image: string) => {
             setCurrentImage(image)
+
+            console.log(acceptedImages)
+
+            if (isRoomCreator) {
+                let trainingImages = acceptedImages.concat(refusedImages)
+                let trainingLabels = Array(acceptedImages.length).fill(1).concat(Array(refusedImages.length).fill(0))
+                trainModel(trainingImages, trainingLabels).then(() => {
+                    console.log("The model is trained with " + trainingImages.length + " samples")
+                })
+                predictImage(image).then((prediction) => {
+                    console.log("The prediction is " + prediction)
+                })
+            }
 
             setVotingDisabled(false)
 
@@ -111,6 +164,8 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
         })
 
         socket.on('endOfRound', (usersPoints: {[pseudo: string]: number}, creatorVote: number) => {
+            console.log('end of round')
+            console.log(currentImage)
             if (creatorVote > 0) {
                 setAcceptedImages([...acceptedImages, currentImage])
             } else {
@@ -124,7 +179,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                 setIsPointsModalOpen(true)
             }
         })
-    },[acceptedImages, currentImage, isRoomCreator, pseudo, refusedImages, socket, waitOnCreator])
+    }, [socket, currentImage])
 
     return (
         <>
@@ -152,7 +207,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                 </Grid>
                 <Grid container item alignItems="center" justifyContent="center" xs={12}>
                     <Box sx={{ height: 200 }}>
-                        {currentImage ? <Image src={currentImage} duration={1000} height={200} /> : null}
+                        {currentImage ? <MuiImage src={currentImage} duration={1000} height={200} /> : null}
                     </Box>
                 </Grid>
                 <Grid container item textAlign="center" alignItems="center" xs={12}>
