@@ -131,28 +131,31 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
     }, [isRoomCreator, roomData.hasAI])
 
     useEffect(() => {
-        const onNewRound = (image: string) => {
+        const onNewRound = async (image: string) => {
             setCurrentImage(image)
-
-            if (isRoomCreator && roomData.hasAI && (acceptedImages.length > 0 || refusedImages.length > 0)) {
-                let trainingImages = acceptedImages.concat(refusedImages)
-                let trainingLabels = Array(acceptedImages.length).fill(1).concat(Array(refusedImages.length).fill(0))
-                trainModel(trainingImages, trainingLabels).then(() => {
-                    console.log("The model is trained with " + trainingImages.length + " samples")
-                })
-                predictImage(image).then((prediction) => {
-                    console.log("The prediction is " + prediction)
-                    let aiVote = (prediction[1] - 0.5) * 2
-                    aiVote = Number(aiVote.toFixed(2))
-                    socket.emit('vote', room, "Eleus-IA", aiVote)
-                })
-            }
 
             setVotingDisabled(false)
 
             setWaitOnCreator(false)
 
             setTimerKey(prevTimerKey => prevTimerKey + 1)
+
+            if (isRoomCreator && roomData.hasAI && (acceptedImages.length > 0 || refusedImages.length > 0)) {
+                let trainingImages = acceptedImages.concat(refusedImages)
+                let trainingLabels = Array(acceptedImages.length).fill(1).concat(Array(refusedImages.length).fill(0))
+                try {
+                    await trainModel(trainingImages, trainingLabels)
+                    console.log("The model is trained with " + trainingImages.length + " samples")
+
+                    const prediction = await predictImage(image)
+                    console.log("The prediction is " + prediction)
+                    let aiVote = (prediction[1] - 0.5) * 2
+                    aiVote = Number(aiVote.toFixed(2))
+                    socket.emit('vote', room, "Eleus-IA", aiVote)
+                } catch (error) {
+                    console.error("Error training the model: ", error)
+                }
+            }
         }
 
         socket.on('newRound', onNewRound)
