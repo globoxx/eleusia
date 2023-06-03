@@ -173,29 +173,31 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                                     <IconButton color="primary" onClick={() => downloadImages(newRoomImageSet)} disabled={newRoomImageSet.length === 0}><FileDownloadOutlined /></IconButton>
                                 </Tooltip>
                             </Stack>
-                            <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                                <ImageList variant="masonry" cols={8}>
-                                    {selectedImages.slice(0, 50).map((item: string) => (
-                                        <ImageListItem key={item}>
-                                            <img
-                                                src={`${item}?w=50&fit=crop&auto=format`}
-                                                srcSet={`${item}?w=50&fit=crop&auto=format&dpr=2 2x`}
-                                                alt={item}
-                                                loading="lazy" />
-                                        </ImageListItem>
-                                    ))}
-                                </ImageList>
-                            </Box>
+                            {newRoomImageSet &&
+                                <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
+                                    <ImageList variant="masonry" cols={8}>
+                                        {selectedImages.slice(0, 50).map((item: string) => (
+                                            <ImageListItem key={item}>
+                                                <img
+                                                    src={`${item}?w=50&fit=crop&auto=format`}
+                                                    srcSet={`${item}?w=50&fit=crop&auto=format&dpr=2 2x`}
+                                                    alt={item}
+                                                    loading="lazy" />
+                                            </ImageListItem>
+                                        ))}
+                                    </ImageList>
+                                </Box>
+                            }
                             <Stack direction="row" alignItems="center">
                                 <FormControlLabel control={<Switch checked={labelsSwitchChecked} onChange={handleLabelsSwitchChange} inputProps={{ 'aria-label': 'controlled' }} />} label="Préparer les labels à l'avance" />
                                 <HelpTooltip title="Cocher cette option permet de définir les labels à l'avance. Cela vous permet de ne pas avoir à catégoriser les images en cours de partie." />
                             </Stack>
                             <TransferImage key={newRoomImageSet} visible={labelsSwitchChecked} imagesList={selectedImages} callback={callbackLabels} />
-                            <TextField required label="Règle d'acceptation" multiline value={newRoomRule} onChange={(e) => setNewRoomRule(e.target.value)} variant="outlined" fullWidth />
                             <Stack direction="row" alignItems="center">
                                 <FormControlLabel control={<Switch checked={AISwitchChecked} onChange={handleAISwitchChange} inputProps={{ 'aria-label': 'controlled' }} />} label="Ajouter une IA comme joueur (beta)" />
-                                <HelpTooltip title="Cocher cette option va ajouter une IA à la liste des joueurs. Elle va s'entraîner à chaque image et faire ses prédictions comme tout autre joueur. Plus d'informations dans les règles du jeu." />
+                                <HelpTooltip title="Cocher cette option va ajouter une IA à la liste des joueurs. Elle va s'entraîner à chaque image et faire ses prédictions comme tout autre joueur. Le modèle est un MobileNet-V3-small pré-entrainé identique à celui de Teachable Machine de Google." />
                             </Stack>
+                            <TextField required label="Règle d'acceptation" multiline value={newRoomRule} onChange={(e) => setNewRoomRule(e.target.value)} variant="outlined" fullWidth />
                             <Button sx={{ marginTop: 2 }} variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0 || newRoomImageSet.length === 0 || newRoomRoundDuration.length === 0 || newRoomRule.length === 0 || (labelsSwitchChecked && (left.length === 0 || right.length === 0))} onClick={handleClickCreateRoom}>{labelsSwitchChecked ? 'Préparer la room !' : 'Créer la room et superviser !'}</Button>
                         </Stack>
                     </AccordionDetails>
