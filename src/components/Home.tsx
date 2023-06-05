@@ -166,6 +166,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                                     <MenuItem value={'shapes'}>Formes</MenuItem>
                                     <MenuItem value={'faces'}>Visages</MenuItem>
                                     <MenuItem value={'cars'}>Voitures</MenuItem>
+                                    <MenuItem value={'animals'}>Animaux</MenuItem>
                                     <MenuItem value={'abstract'}>Art abstrait</MenuItem>
                                     <MenuItem value={'words'}>Mots</MenuItem>
                                 </Select>
