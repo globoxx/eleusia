@@ -81,6 +81,8 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
     const [votingDisabled, setVotingDisabled] = useState(true)
     const [acceptedImages, setAcceptedImages] = useState<string[]>([])
     const [refusedImages, setRefusedImages] = useState<string[]>([])
+    const [allImages, setAllImages] = useState<string[]>([])
+    const [allLabels, setAllLabels] = useState<string[]>([])
     const [vote, setVote] = useState<number>(0)
 
     const [isPointsModalOpen, setIsPointsModalOpen] = useState(false)
@@ -134,6 +136,8 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
         const onNewRound = async (image: string) => {
             setCurrentImage(image)
 
+            setAllImages(current => [...current, image])
+
             setVotingDisabled(false)
 
             setWaitOnCreator(false)
@@ -182,13 +186,17 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
 
     useEffect(()=>{
         const onEndOfRound = (usersPoints: {[pseudo: string]: number}, creatorVote: number) => {
+            let label
             if (creatorVote > 0) {
                 setAcceptedImages([...acceptedImages, currentImage])
+                label = "Accepté"
             } else {
                 setRefusedImages([...refusedImages, currentImage])
+                label = "Refusé"
             }
 
             setCurrentImage('')
+            setAllLabels(current => [...current, label])
             
             if (!isRoomCreator) {
                 setModalPoints(usersPoints[pseudo])
@@ -286,7 +294,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
             </Grid>
         </Grid>
         {!isRoomCreator && <PointsModal open={isPointsModalOpen} handleClose={() => setIsPointsModalOpen(false)} points={modalPoints} />}
-        <EndOfGameModal open={roomData.hasFinished} rule={roomData.rule} users={roomData.users} pseudo={pseudo} creatorPseudo={roomData.creator} />
+        <EndOfGameModal open={roomData.hasFinished} rule={roomData.rule} users={roomData.users} pseudo={pseudo} creatorPseudo={roomData.creator} images={allImages} labels={allLabels} />
         </>
     )
 }
