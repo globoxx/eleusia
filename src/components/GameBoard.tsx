@@ -144,6 +144,11 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
 
             setTimerKey(prevTimerKey => prevTimerKey + 1)
 
+            if (isRoomCreator && roomData.autoRun) {
+                const creatorVote = roomData.acceptedImages.includes(image) ? 1 : -1
+                socket.emit('vote', room, pseudo, creatorVote)
+            }
+
             if (isRoomCreator && roomData.hasAI && (acceptedImages.length > 0 || refusedImages.length > 0)) {
                 let trainingImages = acceptedImages.concat(refusedImages)
                 let trainingLabels = Array(acceptedImages.length).fill(1).concat(Array(refusedImages.length).fill(0))
@@ -164,7 +169,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
 
         socket.on('newRound', onNewRound)
         return () => {socket.off('newRound', onNewRound)}
-    }, [acceptedImages, isRoomCreator, refusedImages, room, roomData.hasAI, socket])
+    }, [acceptedImages, isRoomCreator, pseudo, refusedImages, room, roomData.acceptedImages, roomData.autoRun, roomData.hasAI, socket])
 
     useEffect(() => {
         const onTimer = (timer: number) => {

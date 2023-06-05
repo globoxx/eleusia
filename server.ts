@@ -254,17 +254,8 @@ setInterval(function(){
       }
       if (data[roomId].timer <= 0) {
         const creator = data[roomId].creator
-        let creatorVote: number | null = null
-        if (data[roomId].autoRun) {
-          const currentImage = data[roomId].currentImage
-          if (currentImage) {
-            creatorVote = data[roomId].acceptedImages.includes(currentImage) ? 1 : -1
-          } else {
-            console.log('CURRENT IMAGE IS NULL')
-          }
-        } else {
-          creatorVote = data[roomId].users[creator].vote
-        }
+        const creatorVote = data[roomId].users[creator]?.vote
+
         if (creatorVote != null) {
           const usersPoints: {[pseudo: string]: number} = {}
           for (const userPseudo of Object.keys(data[roomId].users)) {

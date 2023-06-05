@@ -213,9 +213,9 @@ function startNewRound(roomId) {
     io.in(roomId).emit('updateRoomData', data[roomId]);
 }
 setInterval(function () {
-    var _a;
-    for (var _i = 0, _b = Object.keys(data); _i < _b.length; _i++) {
-        var roomId = _b[_i];
+    var _a, _b;
+    for (var _i = 0, _c = Object.keys(data); _i < _c.length; _i++) {
+        var roomId = _c[_i];
         if (data[roomId].hasStarted && !data[roomId].hasFinished && !data[roomId].paused) {
             data[roomId].timer--;
             if (Object.values(data[roomId].users).map(function (user) { return user.vote; }).every(function (vote) { return vote !== null; })) {
@@ -223,25 +223,13 @@ setInterval(function () {
             }
             if (data[roomId].timer <= 0) {
                 var creator = data[roomId].creator;
-                var creatorVote = null;
-                if (data[roomId].autoRun) {
-                    var currentImage = data[roomId].currentImage;
-                    if (currentImage) {
-                        creatorVote = data[roomId].acceptedImages.includes(currentImage) ? 1 : -1;
-                    }
-                    else {
-                        console.log('CURRENT IMAGE IS NULL');
-                    }
-                }
-                else {
-                    creatorVote = data[roomId].users[creator].vote;
-                }
+                var creatorVote = (_a = data[roomId].users[creator]) === null || _a === void 0 ? void 0 : _a.vote;
                 if (creatorVote != null) {
                     var usersPoints = {};
-                    for (var _c = 0, _d = Object.keys(data[roomId].users); _c < _d.length; _c++) {
-                        var userPseudo = _d[_c];
+                    for (var _d = 0, _e = Object.keys(data[roomId].users); _d < _e.length; _d++) {
+                        var userPseudo = _e[_d];
                         if (userPseudo !== creator) {
-                            var userVote = (_a = data[roomId].users[userPseudo].vote) !== null && _a !== void 0 ? _a : 0;
+                            var userVote = (_b = data[roomId].users[userPseudo].vote) !== null && _b !== void 0 ? _b : 0;
                             var points = Math.round((1 - Math.abs(creatorVote - userVote)) * 100);
                             data[roomId].users[userPseudo].lastScore = points;
                             data[roomId].users[userPseudo].allScores.push(points);
