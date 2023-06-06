@@ -99,10 +99,6 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
     const isRoomCreator = roomData ? pseudo === roomData.creator : false
     const isAutoRun = roomData ? roomData.autoRun : false
 
-    if (!(pseudo in roomData.users)) {
-        alert('Vous avez été déconnecté de la partie !')
-    }
-
     const handleClickStartGame = () => {
         socket.emit('startGame', room)
     }
