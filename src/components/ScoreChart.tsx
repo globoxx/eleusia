@@ -33,6 +33,18 @@ function generateRange(a: number, b: number) {
     return range
 }
 
+const COLORS = [
+  'rgba(255, 99, 132, 0.5)',
+  'rgba(54, 162, 235, 0.5)',
+  'rgba(255, 206, 86, 0.5)',
+  'rgba(75, 192, 192, 0.5)',
+  'rgba(153, 102, 255, 0.5)',
+  'rgba(255, 159, 64, 0.5)',
+  'rgba(255, 99, 132, 0.5)',
+  'rgba(54, 162, 235, 0.5)',
+]
+
+
 export default function ScoreChart({scores, pseudo, isCreator, allImages, allLabels}: {scores: {[pseudo: string]: number[]}, pseudo: string, isCreator: boolean, allImages: string[], allLabels: string[]}){
     const [cummulative, setCummulative] = useState(false)
     const [initialScores, setInitialScores] = useState(scores) // Copie les scores dans l'état lors du montage
@@ -51,11 +63,10 @@ export default function ScoreChart({scores, pseudo, isCreator, allImages, allLab
     const data = {
         labels: labels,
         datasets: Object.keys(initialScores).map((player, index) => ({
-            // Utilise initialScores au lieu de scores pour dessiner le graphique
             label: player,
             data: cummulative ? cumulativeSum(Object.values(initialScores[player])) : Object.values(initialScores[player]),
-            backgroundColor: `rgba(${index * 50}, ${index * 100}, ${index * 150}, 0.5)`, 
-            borderColor: `rgba(${index * 50}, ${index * 100}, ${index * 150}, 1)`, 
+            backgroundColor: COLORS[index % COLORS.length],
+            borderColor: COLORS[index % COLORS.length].replace('0.5', '1'),
             hidden: !isCreator && player !== pseudo,
         })),
     }
