@@ -38,7 +38,7 @@ function RulesModal({open, handleClose}: {open: boolean, handleClose: any}) {
                         <Typography variant="h4" paragraph>But du jeu:</Typography>
                         <Typography variant="body1" paragraph component="ol">
                             En rejoignant une room, vous rejoindrez d'autres joueurs dont l'objectif est d'apprendre à catégoriser des images qui vous seront présentées successivement.
-                            La catégorie de chaque image est fixée selon une règle secrète créée par le créateur de la room qui fait office de superviseur.
+                            La catégorie de chaque image est fixée selon une règle secrète créée par le créateur de la room qui fait office de superviseur.<br />
                             Votre objectif est de deviner la catégorie de chaque image et de voter pour la catégorie que vous pensez être la bonne. A chaque vote, vous gagnerez ou perdrez des points en fonction de la justesse de votre prédiction.
                             Le but du jeu est d'obtenir le plus de points possible.
                         </Typography>
@@ -46,8 +46,8 @@ function RulesModal({open, handleClose}: {open: boolean, handleClose: any}) {
                         <Typography variant="body1" paragraph component="ol">
                             Le jeu a pour objectif de faire découvrir aux joueurs le fonctionnement de l'apprentissage supervisé.
                             En effet, chaque joueur joue le rôle d'une IA qui doit apprendre à catégoriser des images selon une règle secrète.
-                            L'amélioration des prédictions passe donc uniquement par l'observation des résultats des prédictions précédentes.
-                            De plus, il est possible de faire jouer une réelle IA et de comparer ses résultats à ceux des élèves.
+                            L'amélioration des prédictions passe donc uniquement par l'observation des résultats des prédictions précédentes.<br />
+                            De plus, il est possible de faire jouer une réelle IA et de comparer ses résultats à ceux des élèves.<br />
                             Le jeu permet d'aborder de multiples notions fondamentales de l'IA: 
                             <ul>
                                 <li>
@@ -62,7 +62,7 @@ function RulesModal({open, handleClose}: {open: boolean, handleClose: any}) {
                             </ul>
                         </Typography>
                         <Typography variant="caption">
-                            Développé dans le cadre du mémoire HEP pour le secondaire II de Vincent Gürtler
+                            Développé dans le cadre du mémoire HEP pour le secondaire II de Vincent Gürtler<br />
                             Code source: <a href="https://github.com/globoxx/eleusia">par ici !</a>
                         </Typography>
                     </Grid>
