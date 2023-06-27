@@ -151,8 +151,12 @@ io.on('connection', (socket: Socket) => {
 
   socket.on('vote', (roomId: string, pseudo: string, vote: number) => {
     console.log(`In room ${roomId}, ${pseudo} voted ${vote}`)
-    data[roomId].users[pseudo].vote = vote
-    io.in(roomId).emit('updateRoomData', data[roomId])
+    if (pseudo in data[roomId].users) {
+      data[roomId].users[pseudo].vote = vote
+      io.in(roomId).emit('updateRoomData', data[roomId])
+    } else {
+      console.log(`ERROR, ${pseudo} NOT IN ROOM`)
+    }
   })
 
   socket.on('endGame', (roomId: string) => {

@@ -125,8 +125,13 @@ io.on('connection', function (socket) {
     });
     socket.on('vote', function (roomId, pseudo, vote) {
         console.log("In room ".concat(roomId, ", ").concat(pseudo, " voted ").concat(vote));
-        data[roomId].users[pseudo].vote = vote;
-        io.in(roomId).emit('updateRoomData', data[roomId]);
+        if (pseudo in data[roomId].users) {
+            data[roomId].users[pseudo].vote = vote;
+            io.in(roomId).emit('updateRoomData', data[roomId]);
+        }
+        else {
+            console.log("ERROR, ".concat(pseudo, " NOT IN ROOM"));
+        }
     });
     socket.on('endGame', function (roomId) {
         console.log("The creator ended the game in room ".concat(roomId));
