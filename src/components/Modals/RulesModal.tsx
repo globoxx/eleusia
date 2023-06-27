@@ -32,7 +32,7 @@ function RulesModal({open, handleClose}: {open: boolean, handleClose: any}) {
                 <Box sx={style}>
                 <Grid container justifyContent="center" spacing={5}>
                     <Grid item xs={12}>
-                        <Typography variant="h3" align="center">Règles du jeu</Typography>
+                        <Typography variant="h3" align="center">Eleus-IA: Dans la peau d'une IA</Typography>
                     </Grid>
                     <Grid item xs={12}>
                         <Typography variant="h4" paragraph>But du jeu:</Typography>
@@ -47,10 +47,23 @@ function RulesModal({open, handleClose}: {open: boolean, handleClose: any}) {
                             Le jeu a pour objectif de faire découvrir aux joueurs le fonctionnement de l'apprentissage supervisé.
                             En effet, chaque joueur joue le rôle d'une IA qui doit apprendre à catégoriser des images selon une règle secrète.
                             L'amélioration des prédictions passe donc uniquement par l'observation des résultats des prédictions précédentes.
-                            Le jeu permet également de mettre en avant l'importance de la qualité des données d'entraînement et des labels.
+                            De plus, il est possible de faire jouer une réelle IA et de comparer ses résultats à ceux des élèves.
+                            Le jeu permet d'aborder de multiples notions fondamentales de l'IA: 
+                            <ul>
+                                <li>
+                                    Importance de la qualité et de la quantité des données
+                                </li>
+                                <li>
+                                    Rôle de l'erreur durant l'apprentissage
+                                </li>
+                                <li>
+                                    Opacité du raisonnement de l'IA
+                                </li>
+                            </ul>
                         </Typography>
                         <Typography variant="caption">
                             Développé dans le cadre du mémoire HEP pour le secondaire II de Vincent Gürtler
+                            Code source: <a href="https://github.com/globoxx/eleusia">par ici !</a>
                         </Typography>
                     </Grid>
                     </Grid>
