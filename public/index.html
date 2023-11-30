@@ -1,57 +1,43 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Eleus-IA</title>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Web site created using create-react-app"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <!--
+      manifest.json provides metadata used when your web app is installed on a
+      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
+    -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <!--
+      Notice the use of %PUBLIC_URL% in the tags above.
+      It will be replaced with the URL of the `public` folder during the build.
+      Only files inside the `public` folder can be referenced from the HTML.
+
+      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
+      work correctly both with client-side routing and a non-root public URL.
+      Learn how to configure a non-root public URL by running `npm run build`.
+    -->
+    <title>React App</title>
   </head>
   <body>
-    <h1>Commencer à jouer</h1>
-    <div>
-      <input id="pseudo" placeholder="Pseudo" />
-    </div>
-    <div>
-      <input id="room-id" placeholder="Room ID" />
-      <button id="join-room">Joindre room</button>
-    </div>
-    <div>
-      <button id="create-room">Créer room</button>
-    </div>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <!--
+      This HTML file is a template.
+      If you open it directly in the browser, you will see an empty page.
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-      const socket = io();
-      let rooms = [];
+      You can add webfonts, meta tags, or analytics to this file.
+      The build step will place the bundled scripts into the <body> tag.
 
-      socket.on('updateRooms', (available_rooms) => {
-        rooms = available_rooms;
-      })
-
-      document.getElementById('create-room').addEventListener('click', () => {
-        const pseudo = document.getElementById('pseudo').value;
-        const min = 1000
-        const max = 9999
-        const roomId = (Math.floor(Math.random()*(max-min+1)+min)).toString();
-        if (pseudo) {
-          socket.emit('createRoom', roomId, pseudo);
-          window.location.href = `/counter.html?room=${roomId}&pseudo=${pseudo}`;
-        } else {
-          alert('Please enter a pseudo to create a room.');
-        }
-      });
-
-      document.getElementById('join-room').addEventListener('click', () => {
-        const pseudo = document.getElementById('pseudo').value;
-        const roomId = document.getElementById('room-id').value;
-        if (pseudo && roomId) {
-          if (rooms.includes(roomId)) {
-            window.location.href = `/counter.html?room=${roomId}&pseudo=${pseudo}`;
-          } else {
-            alert('The room does not exist.');
-          }
-        } else {
-          alert('Please enter a username and room ID to join a room.');
-        }
-      });
-
-    </script>
+      To begin the development, run `npm start` or `yarn start`.
+      To create a production bundle, use `npm run build` or `yarn build`.
+    -->
   </body>
 </html>
