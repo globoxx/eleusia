@@ -4,7 +4,7 @@ import React from "react";
 function ImagesContainer({images, category} : {images: string[], category: string}) {
     return (
         <Box sx={{maxHeight: 200, overflow: 'auto'}}>
-            <ImageList variant="masonry" cols={10}>
+            <ImageList variant="masonry" cols={6}>
                 {images.map((item) => (
                     <ImageListItem key={item}>
                     <img

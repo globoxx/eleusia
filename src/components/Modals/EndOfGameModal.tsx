@@ -15,9 +15,9 @@ const style = {
     p: 4,
 }
 
-function EndOfGameModal({rule, open, users, pseudo, creatorPseudo}: {rule: string, open: boolean, users: {[pseudo: string]: User}, pseudo: string, creatorPseudo: string}) {
+function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, labels}: {rule: string, open: boolean, users: {[pseudo: string]: User}, pseudo: string, creatorPseudo: string, images: string[], labels: string[]}) {
     const scores: {[pseudo: string]: number[]} = Object.assign({}, ...Object.entries(users).filter(([pseudo,]) => pseudo !== creatorPseudo).map(([pseudo, user]) => ({[pseudo]: user.allScores})))
-    const scoresReadyToShow = Object.keys(scores).length > 0 && Object.values(scores).every(userScores => userScores.length > 0)
+    const scoresReadyToShow = open && Object.keys(scores).length > 0 && Object.values(scores).every(userScores => userScores.length > 0)
     return (
         <Modal
             open={open}
@@ -39,7 +39,7 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo}: {rule: strin
                     <Typography marginTop={5} sx={{marginBottom: 2}}>
                         La règle était : <em>{rule}</em>
                     </Typography>
-                    {scoresReadyToShow && <ScoreChart scores={scores} pseudo={pseudo} isCreator={pseudo === creatorPseudo} />}
+                    {scoresReadyToShow && <ScoreChart scores={scores} pseudo={pseudo} isCreator={pseudo === creatorPseudo} allImages={images} allLabels={labels} />}
                 </Box>
             </Fade>
         </Modal>

@@ -1,4 +1,15 @@
 "use strict";
+var __assign = (this && this.__assign) || function () {
+    __assign = Object.assign || function(t) {
+        for (var s, i = 1, n = arguments.length; i < n; i++) {
+            s = arguments[i];
+            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+                t[p] = s[p];
+        }
+        return t;
+    };
+    return __assign.apply(this, arguments);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 var express = require("express");
 var cors = require("cors");
@@ -35,7 +46,7 @@ io.on('connection', function (socket) {
         return !roomData.hasStarted;
     }))));
     socket.emit("updateImages", allImages);
-    socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet, rule, autoRun, left, right) {
+    socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet, rule, autoRun, hasAI, left, right) {
         var _a;
         if (roomId in data) {
             console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " tried to create room ").concat(roomId, " but this room already exists !"));
@@ -49,6 +60,7 @@ io.on('connection', function (socket) {
             roundDuration: roundDuration,
             creator: pseudo,
             autoRun: autoRun,
+            hasAI: hasAI,
             paused: false,
             refusedImages: left,
             acceptedImages: right,
@@ -57,15 +69,19 @@ io.on('connection', function (socket) {
             timer: roundDuration,
             images: images,
             currentImage: null,
-            users: (_a = {},
-                _a[pseudo] = {
-                    socketId: socket.id,
+            users: __assign((_a = {}, _a[pseudo] = {
+                socketId: socket.id,
+                totalScore: 0,
+                lastScore: null,
+                allScores: [],
+                vote: null
+            }, _a), (hasAI && { 'Eleus-IA': {
+                    socketId: '0',
                     totalScore: 0,
                     lastScore: null,
                     allScores: [],
                     vote: null
-                },
-                _a)
+                } }))
         };
         socket.join(roomId);
         io.in(roomId).emit('updateRoomData', data[roomId]);
@@ -109,8 +125,13 @@ io.on('connection', function (socket) {
     });
     socket.on('vote', function (roomId, pseudo, vote) {
         console.log("In room ".concat(roomId, ", ").concat(pseudo, " voted ").concat(vote));
-        data[roomId].users[pseudo].vote = vote;
-        io.in(roomId).emit('updateRoomData', data[roomId]);
+        if (pseudo in data[roomId].users) {
+            data[roomId].users[pseudo].vote = vote;
+            io.in(roomId).emit('updateRoomData', data[roomId]);
+        }
+        else {
+            console.log("ERROR, ".concat(pseudo, " NOT IN ROOM"));
+        }
     });
     socket.on('endGame', function (roomId) {
         console.log("The creator ended the game in room ".concat(roomId));
@@ -197,9 +218,9 @@ function startNewRound(roomId) {
     io.in(roomId).emit('updateRoomData', data[roomId]);
 }
 setInterval(function () {
-    var _a;
-    for (var _i = 0, _b = Object.keys(data); _i < _b.length; _i++) {
-        var roomId = _b[_i];
+    var _a, _b;
+    for (var _i = 0, _c = Object.keys(data); _i < _c.length; _i++) {
+        var roomId = _c[_i];
         if (data[roomId].hasStarted && !data[roomId].hasFinished && !data[roomId].paused) {
             data[roomId].timer--;
             if (Object.values(data[roomId].users).map(function (user) { return user.vote; }).every(function (vote) { return vote !== null; })) {
@@ -207,25 +228,13 @@ setInterval(function () {
             }
             if (data[roomId].timer <= 0) {
                 var creator = data[roomId].creator;
-                var creatorVote = null;
-                if (data[roomId].autoRun) {
-                    var currentImage = data[roomId].currentImage;
-                    if (currentImage) {
-                        creatorVote = data[roomId].acceptedImages.includes(currentImage) ? 1 : -1;
-                    }
-                    else {
-                        console.log('CURRENT IMAGE IS NULL');
-                    }
-                }
-                else {
-                    creatorVote = data[roomId].users[creator].vote;
-                }
+                var creatorVote = (_a = data[roomId].users[creator]) === null || _a === void 0 ? void 0 : _a.vote;
                 if (creatorVote != null) {
                     var usersPoints = {};
-                    for (var _c = 0, _d = Object.keys(data[roomId].users); _c < _d.length; _c++) {
-                        var userPseudo = _d[_c];
+                    for (var _d = 0, _e = Object.keys(data[roomId].users); _d < _e.length; _d++) {
+                        var userPseudo = _e[_d];
                         if (userPseudo !== creator) {
-                            var userVote = (_a = data[roomId].users[userPseudo].vote) !== null && _a !== void 0 ? _a : 0;
+                            var userVote = (_b = data[roomId].users[userPseudo].vote) !== null && _b !== void 0 ? _b : 0;
                             var points = Math.round((1 - Math.abs(creatorVote - userVote)) * 100);
                             data[roomId].users[userPseudo].lastScore = points;
                             data[roomId].users[userPseudo].allScores.push(points);

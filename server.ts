@@ -38,6 +38,7 @@ export interface RoomData {
   roundDuration: number,
   creator: string,
   autoRun: boolean,
+  hasAI: boolean,
   paused: boolean,
   refusedImages: string[],
   acceptedImages: string[],
@@ -68,7 +69,7 @@ io.on('connection', (socket: Socket) => {
   socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
   socket.emit("updateImages", allImages)
 
-  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, left: string[], right: string[]) => {
+  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, hasAI: boolean, left: string[], right: string[]) => {
     if (roomId in data) {
       console.log(`User ${socket.id} with pseudo ${pseudo} tried to create room ${roomId} but this room already exists !`)
       socket.emit('roomAlreadyExists')
@@ -81,6 +82,7 @@ io.on('connection', (socket: Socket) => {
       roundDuration: roundDuration,
       creator: pseudo,
       autoRun: autoRun,
+      hasAI: hasAI,
       paused: false,
       refusedImages: left,
       acceptedImages: right,
@@ -96,7 +98,14 @@ io.on('connection', (socket: Socket) => {
           lastScore: null,
           allScores: [],
           vote: null
-        }
+        },
+        ...(hasAI && {'Eleus-IA': {
+          socketId: '0',
+          totalScore: 0,
+          lastScore: null,
+          allScores: [],
+          vote: null
+        }})
       }
     }
 
@@ -142,8 +151,12 @@ io.on('connection', (socket: Socket) => {
 
   socket.on('vote', (roomId: string, pseudo: string, vote: number) => {
     console.log(`In room ${roomId}, ${pseudo} voted ${vote}`)
-    data[roomId].users[pseudo].vote = vote
-    io.in(roomId).emit('updateRoomData', data[roomId])
+    if (pseudo in data[roomId].users) {
+      data[roomId].users[pseudo].vote = vote
+      io.in(roomId).emit('updateRoomData', data[roomId])
+    } else {
+      console.log(`ERROR, ${pseudo} NOT IN ROOM`)
+    }
   })
 
   socket.on('endGame', (roomId: string) => {
@@ -245,17 +258,8 @@ setInterval(function(){
       }
       if (data[roomId].timer <= 0) {
         const creator = data[roomId].creator
-        let creatorVote: number | null = null
-        if (data[roomId].autoRun) {
-          const currentImage = data[roomId].currentImage
-          if (currentImage) {
-            creatorVote = data[roomId].acceptedImages.includes(currentImage) ? 1 : -1
-          } else {
-            console.log('CURRENT IMAGE IS NULL')
-          }
-        } else {
-          creatorVote = data[roomId].users[creator].vote
-        }
+        const creatorVote = data[roomId].users[creator]?.vote
+
         if (creatorVote != null) {
           const usersPoints: {[pseudo: string]: number} = {}
           for (const userPseudo of Object.keys(data[roomId].users)) {
