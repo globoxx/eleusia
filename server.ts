@@ -272,6 +272,7 @@ setInterval(function(){
               usersPoints[userPseudo] = points
             }
           }
+          io.in(roomId).emit('updateRoomData', data[roomId])
           io.in(roomId).emit('endOfRound', usersPoints, creatorVote)
           // -----------------------------------------------------
           startNewRound(roomId)
