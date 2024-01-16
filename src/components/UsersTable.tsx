@@ -20,7 +20,7 @@ function UsersTable({roomData, pseudo}: {roomData: RoomData, pseudo: string}) {
                         <TableCell>Score total</TableCell>
                     </TableRow>
                 </TableHead>
-                <TableBody>
+                <TableBody key={Object.entries(roomData.users).sort(([, user]: [string, User]) => -user.totalScore).map(([linePseudo, user]: [string, User]) => linePseudo).join('-')}>
                 {Object.entries(roomData.users).sort(([, user]: [string, User]) => -user.totalScore).map(([linePseudo, user]: [string, User]) => (
                     (linePseudo !== roomData.creator) && (
                         <TableRow
