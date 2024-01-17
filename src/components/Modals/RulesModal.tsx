@@ -66,8 +66,8 @@ function RulesModal({open, handleClose}: {open: boolean, handleClose: any}) {
                         </Typography>
                         <Typography variant="caption">
                             Développé dans le cadre du mémoire HEP pour le secondaire II de Vincent Gürtler<br />
-                            Code source: <a href="https://github.com/globoxx/eleusia">par ici !</a>
-                            Une question ? Contactez-moi à l'adresse: vincent.gurtler@eduvaud.ch
+                            Code source: <a href="https://github.com/globoxx/eleusia">par ici !</a><br />
+                            Une question ? Contactez-moi à l'adresse: vincent.gurtler@eduvaud.ch<br />
                             Vous pouvez aussi me proposer de nouveaux datasets à ajouter au jeu !
                         </Typography>
                     </Grid>
