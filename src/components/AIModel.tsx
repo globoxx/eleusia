@@ -11,7 +11,7 @@ const MyModel = {
   model: null as tf.Sequential | null,
 
   loadFeatureExtractor: async () => {
-    const URL = 'https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/default/1';
+    const URL = 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/small-100-224-feature-vector/1';
     MyModel.featureExtractor = await tf.loadGraphModel(URL, {fromTFHub: true});
 
     // Warm up the model by passing zeros through it once.
