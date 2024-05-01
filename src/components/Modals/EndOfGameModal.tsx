@@ -1,4 +1,4 @@
-import { Modal, Box, Typography, Backdrop, Fade } from "@mui/material"
+import { Modal, Box, Typography, Backdrop, Fade, Button } from "@mui/material"
 import React from "react"
 import ScoreChart from "../ScoreChart"
 import { User } from "../../../server"
@@ -43,6 +43,12 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
                         La règle était : <em>{rule}</em>
                     </Typography>
                     {scoresReadyToShow && <ScoreChart scores={scores} pseudo={pseudo} isCreator={pseudo === creatorPseudo} allImages={images} allLabels={labels} />}
+
+                    <Box textAlign='center'>
+                       <Button sx={{marginTop: 5}} variant="contained" color="success" onClick={() => window.location.reload()}>
+                            Revenir à l'accueil
+                        </Button> 
+                    </Box>
                 </Box>
             </Fade>
         </Modal>

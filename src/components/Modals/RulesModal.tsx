@@ -69,6 +69,7 @@ function RulesModal({open, handleClose}: {open: boolean, handleClose: any}) {
                         </Typography>
                         <Typography variant="caption">
                             Développé dans le cadre du mémoire HEP pour le secondaire II de Vincent Gürtler<br />
+                            Tous les datasets du jeu proviennent soit de <a href="https://www.kaggle.com/">Kaggle</a> soit de ma propre création.
                             Code source: <a href="https://github.com/globoxx/eleusia">par ici !</a><br />
                             Une question ? Contactez-moi à l'adresse: vincent.gurtler@eduvaud.ch<br />
                             Vous pouvez aussi me proposer de nouveaux datasets à ajouter au jeu !

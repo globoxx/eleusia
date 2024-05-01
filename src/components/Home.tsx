@@ -62,12 +62,8 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
         }
     }
     const handleClickCreateRoom = () => {
-        if (pseudo) {
-            socket.emit('createRoom', pseudo, newRoom, parseInt(newRoomRoundDuration), newRoomImageSet, newRoomRule, labelsSwitchChecked, AISwitchChecked, left, right)
-            callbackJoinRoom(newRoom)
-        } else {
-            alert('Choisissez un pseudo pour rejoindre une room.');
-        }
+        socket.emit('createRoom', newRoom, parseInt(newRoomRoundDuration), newRoomImageSet, newRoomRule, labelsSwitchChecked, AISwitchChecked, left, right)
+        callbackJoinRoom(newRoom)
     }
 
     const downloadImages = (newRoomImageSet: string) => {
@@ -110,7 +106,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                     Règles du jeu
                 </Button>
                 <Typography variant="h3">ELEUS-IA</Typography>
-                <Typography variant="h5">Qui sera la meilleure IA ?</Typography>
+                <Typography variant="h5">Dans la peau d'une intelligence artificielle</Typography>
             </Grid>
             <Grid item textAlign="center" xs={12}>
                 <TextField required label="Pseudo" value={pseudo} onChange={handlePseudoChange} variant="outlined" />
@@ -168,6 +164,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                                     <MenuItem value={'cars'}>Voitures</MenuItem>
                                     <MenuItem value={'animals'}>Animaux</MenuItem>
                                     <MenuItem value={'abstract'}>Art abstrait</MenuItem>
+                                    <MenuItem value={'objects'}>Objets</MenuItem>
                                     <MenuItem value={'words'}>Mots</MenuItem>
                                 </Select>
                                 <Tooltip title="Télécharger">
@@ -199,7 +196,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                                 <HelpTooltip title="Cocher cette option va ajouter une IA à la liste des joueurs. Elle va s'entraîner à chaque image et faire ses prédictions comme tout autre joueur. Le modèle est un MobileNet-V3-small pré-entrainé identique à celui de Teachable Machine de Google." />
                             </Stack>
                             <TextField required label="Règle d'acceptation" multiline value={newRoomRule} onChange={(e) => setNewRoomRule(e.target.value)} variant="outlined" fullWidth />
-                            <Button sx={{ marginTop: 2 }} variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0 || newRoomImageSet.length === 0 || newRoomRoundDuration.length === 0 || newRoomRule.length === 0 || (labelsSwitchChecked && (left.length === 0 || right.length === 0))} onClick={handleClickCreateRoom}>{labelsSwitchChecked ? 'Préparer la room !' : 'Créer la room et superviser !'}</Button>
+                            <Button sx={{ marginTop: 2 }} variant="contained" disabled={newRoom.length === 0 || newRoomImageSet.length === 0 || newRoomRoundDuration.length === 0 || newRoomRule.length === 0 || (labelsSwitchChecked && (left.length === 0 || right.length === 0))} onClick={handleClickCreateRoom}>{labelsSwitchChecked ? 'Préparer la room !' : 'Créer la room et superviser !'}</Button>
                         </Stack>
                     </AccordionDetails>
                 </Accordion>
