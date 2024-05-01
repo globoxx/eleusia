@@ -40,7 +40,7 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
                         La partie est terminée !
                     </Typography>
                     <Typography marginTop={5} sx={{marginBottom: 2}}>
-                        La règle était : <em>{rule}</em>
+                        La règle était : <b>{rule}</b>
                     </Typography>
 
                     <div>
@@ -48,7 +48,7 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
                     </div>
 
                     <Box textAlign='center'>
-                       <Button sx={{marginTop: 5, zIndex: 1000}} variant="contained" color="success" onClick={() => window.location.reload()}>
+                       <Button sx={{marginTop: 5}} variant="contained" color="success" onClick={() => window.location.reload()}>
                             Revenir à l'accueil
                         </Button> 
                     </Box>
