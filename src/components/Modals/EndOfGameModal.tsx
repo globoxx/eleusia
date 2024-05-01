@@ -42,9 +42,16 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
                     <Typography marginTop={5} sx={{marginBottom: 2}}>
                         La règle était : <em>{rule}</em>
                     </Typography>
-                    {scoresReadyToShow && <ScoreChart scores={scores} pseudo={pseudo} isCreator={pseudo === creatorPseudo} allImages={images} allLabels={labels} />}
-
                     
+                    <div>
+                        {scoresReadyToShow && <ScoreChart scores={scores} pseudo={pseudo} isCreator={pseudo === creatorPseudo} allImages={images} allLabels={labels} />}
+                    </div>
+
+                    <Box textAlign='center'>
+                       <Button sx={{marginTop: 5}} variant="contained" color="success" onClick={() => window.location.reload()}>
+                            Revenir à l'accueil
+                        </Button> 
+                    </Box>
                 </Box>
             </Fade>
         </Modal>
