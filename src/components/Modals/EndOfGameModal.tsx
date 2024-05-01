@@ -44,11 +44,7 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
                     </Typography>
                     {scoresReadyToShow && <ScoreChart scores={scores} pseudo={pseudo} isCreator={pseudo === creatorPseudo} allImages={images} allLabels={labels} />}
 
-                    <Box textAlign='center'>
-                       <Button sx={{marginTop: 5}} variant="contained" color="success" onClick={() => window.location.reload()}>
-                            Revenir à l'accueil
-                        </Button> 
-                    </Box>
+                    
                 </Box>
             </Fade>
         </Modal>
