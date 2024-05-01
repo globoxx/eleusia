@@ -208,12 +208,15 @@ export default function ScoreChart({scores, pseudo, isCreator, allImages, allLab
     
           const td = document.createElement('td');
           td.style.borderWidth = '0';
+          td.style.textAlign = 'center';
     
           const text = document.createTextNode(body);
     
           if (imageSrc && label) {
             td.appendChild(textAboveImage)
-            td.appendChild(img);
+            td.appendChild(document.createElement("br"))
+            td.appendChild(img)
+            td.appendChild(document.createElement("br"))
           }
           td.appendChild(text);
           tr.appendChild(td);

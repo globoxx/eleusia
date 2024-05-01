@@ -8,7 +8,7 @@ const style = {
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    width: 500,
+    width: 800,
     maxWdith: '90vw',
     maxHeight: '90vh',
     overflow: 'auto',
@@ -42,13 +42,13 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
                     <Typography marginTop={5} sx={{marginBottom: 2}}>
                         La règle était : <em>{rule}</em>
                     </Typography>
-                    
+
                     <div>
                         {scoresReadyToShow && <ScoreChart scores={scores} pseudo={pseudo} isCreator={pseudo === creatorPseudo} allImages={images} allLabels={labels} />}
                     </div>
 
                     <Box textAlign='center'>
-                       <Button sx={{marginTop: 5}} variant="contained" color="success" onClick={() => window.location.reload()}>
+                       <Button sx={{marginTop: 5, zIndex: 1000}} variant="contained" color="success" onClick={() => window.location.reload()}>
                             Revenir à l'accueil
                         </Button> 
                     </Box>
