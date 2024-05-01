@@ -1,12 +1,15 @@
 import { Modal, Box, Typography, Backdrop, Fade } from "@mui/material"
-import React from "react"
+import React, { useEffect } from "react"
 
 const style = {
     position: 'absolute' as 'absolute',
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    width: 400,
+    width: 'auto',
+    maxWdith: '90vw',
+    maxHeight: '90vh',
+    overflow: 'auto',
     bgcolor: 'background.paper',
     border: '2px solid #000',
     boxShadow: 24,
@@ -14,6 +17,17 @@ const style = {
 }
 
 function ScoreModal({points, open, handleClose}: {points: number, open: boolean, handleClose: any}) {
+    
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (open) {
+            timer = setTimeout(() => {
+                handleClose();
+            }, 3000); // Ferme le modal après 3000 ms (3 secondes)
+        }
+        return () => clearTimeout(timer); // Nettoie le timer quand le composant est démonté ou réinitialisé
+    }, [open, handleClose]); // Dépendances pour réinitialiser le timer si 'open' ou 'handleClose' change
+
     return (
         <Modal
             open={open}
