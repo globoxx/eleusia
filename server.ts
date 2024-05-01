@@ -69,18 +69,18 @@ io.on('connection', (socket: Socket) => {
   socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
   socket.emit("updateImages", allImages)
 
-  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, hasAI: boolean, left: string[], right: string[]) => {
+  socket.on('createRoom', (roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, hasAI: boolean, left: string[], right: string[]) => {
     if (roomId in data) {
-      console.log(`User ${socket.id} with pseudo ${pseudo} tried to create room ${roomId} but this room already exists !`)
+      console.log(`User ${socket.id} tried to create room ${roomId} but this room already exists !`)
       socket.emit('roomAlreadyExists')
       return
     }
-    console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId} with autorun: ${autoRun}`)
+    console.log(`User ${socket.id} created new room ${roomId} with autorun: ${autoRun}`)
     const images = allImages[imageSet]
     data[roomId] = {
       rule: rule,
       roundDuration: roundDuration,
-      creator: pseudo,
+      creator: 'Superviseur',
       autoRun: autoRun,
       hasAI: hasAI,
       paused: false,
@@ -92,7 +92,7 @@ io.on('connection', (socket: Socket) => {
       images: images,
       currentImage: null,
       users: {
-        [pseudo]: {
+        'Superviseur': {
           socketId: socket.id,
           totalScore: 0,
           lastScore: null,
