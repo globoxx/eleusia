@@ -64,7 +64,7 @@ for (const imageFolder of imageFolders) {
 }
 
 io.on('connection', (socket: Socket) => {
-  console.log(`User connected: ${socket.id}`)
+  //console.log(`User connected: ${socket.id}`)
 
   socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
   socket.emit("updateImages", allImages)
@@ -275,7 +275,7 @@ setInterval(function(){
           io.in(roomId).emit('endOfRound', usersPoints, creatorVote)
           startNewRound(roomId)
         } else {
-          console.log('CREATOR VOTE IS NULL, WAIT ON HIM')
+          //console.log('CREATOR VOTE IS NULL, WAIT ON HIM')
           io.in(roomId).emit('waitCreator')
         }
       }

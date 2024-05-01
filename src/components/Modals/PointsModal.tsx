@@ -19,13 +19,13 @@ const style = {
 function ScoreModal({points, open, handleClose}: {points: number, open: boolean, handleClose: any}) {
     
     useEffect(() => {
-        let timer: NodeJS.Timeout;
         if (open) {
-            timer = setTimeout(() => {
+            const timer = setTimeout(() => {
                 handleClose();
             }, 3000); // Ferme le modal après 3000 ms (3 secondes)
+
+            return () => clearTimeout(timer); // Nettoie le timer quand le composant est démonté ou réinitialisé
         }
-        return () => clearTimeout(timer); // Nettoie le timer quand le composant est démonté ou réinitialisé
     }, [open, handleClose]); // Dépendances pour réinitialiser le timer si 'open' ou 'handleClose' change
 
     return (
