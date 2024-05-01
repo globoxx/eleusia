@@ -1,7 +1,7 @@
 import { Box, Grid, Paper, Slider, Stack, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
 import {Image as MuiImage} from 'mui-image';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useEffect } from 'react';
 import { Socket } from 'socket.io-client';
 import { RoomData } from '../../server';
@@ -127,6 +127,10 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
         socket.emit('leaveRoom', room, pseudo)
         callbackLeaveRoom()
     }
+
+    const handleClosePointsModal = useCallback(() => {
+        setIsPointsModalOpen(false);
+    }, []);
 
     useEffect(() => {
         if (isRoomCreator && roomData.hasAI) {
@@ -302,7 +306,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                 </Stack>
             </Grid>
         </Grid>
-        {!isRoomCreator && <PointsModal open={isPointsModalOpen} handleClose={() => setIsPointsModalOpen(false)} points={modalPoints} />}
+        {!isRoomCreator && <PointsModal open={isPointsModalOpen} handleClose={handleClosePointsModal} points={modalPoints} />}
         <EndOfGameModal open={roomData.hasFinished} rule={roomData.rule} users={roomData.users} pseudo={pseudo} creatorPseudo={roomData.creator} images={allImages} labels={allLabels} />
         </>
     )
