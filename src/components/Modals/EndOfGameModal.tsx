@@ -37,7 +37,7 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
         >
             <Fade in={open}>
                 <Box sx={style}>
-                    <Button sx={{marginTop: 5}} startIcon={<HomeOutlined />} variant="contained" color="success" onClick={() => window.location.reload()}>
+                    <Button sx={{marginBottom: 5}} startIcon={<HomeOutlined />} variant="contained" color="success" onClick={() => window.location.reload()}>
                         Revenir à l'accueil
                     </Button> 
                     <Typography variant="h3" component="h2">
