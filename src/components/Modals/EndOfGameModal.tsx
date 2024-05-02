@@ -1,4 +1,5 @@
 import { Modal, Box, Typography, Backdrop, Fade, Button } from "@mui/material"
+import { HomeOutlined } from '@mui/icons-material'
 import React from "react"
 import ScoreChart from "../ScoreChart"
 import { User } from "../../../server"
@@ -36,6 +37,9 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
         >
             <Fade in={open}>
                 <Box sx={style}>
+                    <Button sx={{marginTop: 5}} startIcon={<HomeOutlined />} variant="contained" color="success" onClick={() => window.location.reload()}>
+                        Revenir à l'accueil
+                    </Button> 
                     <Typography variant="h3" component="h2">
                         La partie est terminée !
                     </Typography>
@@ -46,12 +50,6 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
                     <div>
                         {scoresReadyToShow && <ScoreChart scores={scores} pseudo={pseudo} isCreator={pseudo === creatorPseudo} allImages={images} allLabels={labels} />}
                     </div>
-
-                    <Box textAlign='center'>
-                       <Button sx={{marginTop: 5}} variant="contained" color="success" onClick={() => window.location.reload()}>
-                            Revenir à l'accueil
-                        </Button> 
-                    </Box>
                 </Box>
             </Fade>
         </Modal>
