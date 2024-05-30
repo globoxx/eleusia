@@ -23,16 +23,14 @@ const marks = [
       label: 'Refuser',
     },
     {
-        value: -0.5,
-        label: 'Plutôt refuser',
+        value: -0.5
     },
     {
         value: 0,
         label: 'Aucune idée',
     },
     {
-        value: 0.5,
-        label: 'Plutôt accepter',
+        value: 0.5
     },
     {
       value: 1,
@@ -272,7 +270,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                             ? (
                                 <>
                                     <Grid item textAlign="center" xs={12}>
-                                        <Slider sx={{ width: 1/2 }}defaultValue={0} aria-label="Default" valueLabelDisplay="auto" step={0.1} min={-1} max={1} marks={marks} onChange={handleDecisionChange} />
+                                        <Slider defaultValue={0} aria-label="Default" valueLabelDisplay="auto" step={0.1} min={-1} max={1} marks={marks} onChange={handleDecisionChange} />
                                     </Grid>
                                     <Grid item textAlign="center" xs={12}>
                                         <Button variant="contained" onClick={() => handleClickVote(vote)} disabled={votingDisabled || timer <= 0}>Confirmer</Button>
