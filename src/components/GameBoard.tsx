@@ -228,7 +228,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                 </Button>
                 <Typography variant="h3">Room {room}</Typography>
             </Grid>
-            <Grid container item textAlign="center" xs={8} spacing={2}>
+            <Grid container item textAlign="center" justifyContent="flex-start" xs={8} spacing={2}>
                 <Grid container item justifyContent="space-evenly" alignItems="center" spacing={2} xs={12}>
                     <Grid item textAlign="center" xs={6}>
                         <Typography variant="h6">Images refusées par le maître</Typography>
@@ -271,7 +271,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                             ? (
                                 <>
                                     <Grid item textAlign="center" xs={12}>
-                                        <Slider defaultValue={0} aria-label="Default" valueLabelDisplay="auto" step={0.1} min={-1} max={1} marks={marks} onChange={handleDecisionChange} />
+                                        <Slider sx={{width: 0.8}} defaultValue={0} aria-label="Default" valueLabelDisplay="auto" step={0.1} min={-1} max={1} marks={marks} onChange={handleDecisionChange} />
                                     </Grid>
                                     <Grid item textAlign="center" xs={12}>
                                         <Button variant="contained" onClick={() => handleClickVote(vote)} disabled={votingDisabled || timer <= 0}>Confirmer</Button>
