@@ -221,7 +221,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
 
     return (
         <>
-        <Grid container justifyContent="space-evenly" alignContent="flex-start" alignItems="center" spacing={2}>
+        <Grid container justifyContent="space-evenly" alignContent="flex-start" spacing={2}>
             <Grid item textAlign="center" xs={12}>
                 <Button variant="outlined" color="error" endIcon={<LogoutIcon />} onClick={leaveRoom} style={{ position: "absolute", left: 20 }}>
                     Quitter la partie
