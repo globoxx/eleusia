@@ -124,6 +124,7 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
     const leaveRoom = () => {
         socket.emit('leaveRoom', room, pseudo)
         callbackLeaveRoom()
+        window.location.reload()
     }
 
     const handleClosePointsModal = useCallback(() => {
