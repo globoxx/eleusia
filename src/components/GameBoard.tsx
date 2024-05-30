@@ -228,8 +228,8 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                 </Button>
                 <Typography variant="h3">Room {room}</Typography>
             </Grid>
-            <Grid container item textAlign="center" justifyContent="flex-start" xs={8} spacing={2}>
-                <Grid container item justifyContent="space-evenly" alignItems="center" spacing={2} xs={12}>
+            <Grid container item textAlign="center" alignItems="center" direction="column" xs={8} spacing={2}>
+                <Grid container item justifyContent="space-evenly" alignItems="center" spacing={2}>
                     <Grid item textAlign="center" xs={6}>
                         <Typography variant="h6">Images refusées par le maître</Typography>
                         <Paper sx={{ height: 200 }} elevation={3}>
@@ -243,12 +243,12 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                         </Paper>
                     </Grid>
                 </Grid>
-                <Grid container item alignItems="center" justifyContent="center" xs={12}>
+                <Grid container item alignItems="center" justifyContent="center">
                     <Box sx={{ height: 200 }}>
                         {currentImage ? <MuiImage src={currentImage} duration={1000} height={200} /> : null}
                     </Box>
                 </Grid>
-                <Grid container item textAlign="center" alignItems="center" xs={12}>
+                <Grid container item textAlign="center" alignItems="center">
                     {isRoomCreator
                         ? (
                             isAutoRun
@@ -261,7 +261,8 @@ function GameBoard({socket, pseudo, room, roomData, callbackLeaveRoom}: GameBoar
                                     <>
                                         <Grid item textAlign="center" xs={6}>
                                             <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>Refuser</Button>
-                                        </Grid><Grid item textAlign="center" xs={6}>
+                                        </Grid>
+                                        <Grid item textAlign="center" xs={6}>
                                             <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>Accepter</Button>
                                         </Grid>
                                     </>
