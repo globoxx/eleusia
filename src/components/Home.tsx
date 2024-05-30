@@ -109,7 +109,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                 <Typography variant="h5">Dans la peau d'une intelligence artificielle</Typography>
             </Grid>
             <Grid item textAlign="center" xs={12}>
-                <TextField required label="Pseudo" value={pseudo} onChange={handlePseudoChange} variant="outlined" />
+                <TextField required label="Pseudo" inputProps={{maxLength: 15}} value={pseudo} onChange={handlePseudoChange} variant="outlined" />
             </Grid>
             <Grid item xs={6}>
                 <Accordion>
@@ -122,7 +122,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                     <AccordionDetails>
                         <Stack spacing={2}>
                             <TextField label="Room code" value={room} onChange={handleRoomChange} variant="outlined" />
-                            <Button variant="contained" disabled={pseudo.length === 0 || room.length === 0} onClick={handleClickJoinRoom}>Rejoindre la room !</Button>
+                            <Button variant="contained" disabled={pseudo.length === 0 || pseudo.length > 15 || room.length === 0} onClick={handleClickJoinRoom}>Rejoindre la room !</Button>
                         </Stack>
                     </AccordionDetails>
                 </Accordion>
