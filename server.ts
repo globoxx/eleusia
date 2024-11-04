@@ -124,6 +124,11 @@ io.on('connection', (socket: Socket) => {
         socket.emit('pseudoAlreadyExists')
         return
       }
+      if (Object.keys(data[roomId].users).length >= 3) {
+        console.log(`User ${socket.id} with pseudo ${pseudo} tried to join room ${roomId} but this room is full !`)
+        socket.emit('roomFull')
+        return
+      }
       console.log(`User ${socket.id} with pseudo ${pseudo} joined room ${roomId}`)
       socket.join(roomId)
       data[roomId].users[pseudo] = {

@@ -40,7 +40,7 @@ for (var _i = 0, imageFolders_1 = imageFolders; _i < imageFolders_1.length; _i++
     _loop_1(imageFolder);
 }
 io.on('connection', function (socket) {
-    console.log("User connected: ".concat(socket.id));
+    //console.log(`User connected: ${socket.id}`)
     socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(function (_a) {
         var roomData = _a[1];
         return !roomData.hasStarted;
@@ -96,6 +96,11 @@ io.on('connection', function (socket) {
             if (pseudo in data[roomId].users) {
                 console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " tried to join room ").concat(roomId, " but this pseudo already exists !"));
                 socket.emit('pseudoAlreadyExists');
+                return;
+            }
+            if (Object.keys(data[roomId].users).length >= 3) {
+                console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " tried to join room ").concat(roomId, " but this room is full !"));
+                socket.emit('roomFull');
                 return;
             }
             console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " joined room ").concat(roomId));
@@ -243,11 +248,10 @@ setInterval(function () {
                         }
                     }
                     io.in(roomId).emit('endOfRound', usersPoints, creatorVote);
-                    // -----------------------------------------------------
                     startNewRound(roomId);
                 }
                 else {
-                    console.log('CREATOR VOTE IS NULL, WAIT ON HIM');
+                    //console.log('CREATOR VOTE IS NULL, WAIT ON HIM')
                     io.in(roomId).emit('waitCreator');
                 }
             }

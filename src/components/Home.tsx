@@ -96,6 +96,10 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
         socket.on('pseudoAlreadyExists', () => {
             alert('Ce pseudo existe déjà dans cette room.')
         })
+
+        socket.on('roomFull', () => {
+            alert('Cette room est déjà pleine.')
+        })
     }, [socket])
 
     return (
