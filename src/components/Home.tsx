@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack, IconButton, Tooltip, Switch, FormControlLabel } from '@mui/material'
+import { TextField, Button, Grid, Accordion, AccordionSummary, AccordionDetails, MenuItem, Select, ImageList, ImageListItem, Box, Typography, Stack, IconButton, Tooltip, Switch, FormControlLabel, Checkbox } from '@mui/material'
 import { Socket } from 'socket.io-client'
 import { ExpandMoreOutlined, FileDownloadOutlined } from '@mui/icons-material'
 import TransferImage from './TransferImage'
@@ -20,6 +20,8 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
     const [newRoomRoundDuration, setNewRoomRoundDuration] = useState('')
     const [newRoomImageSet, setNewRoomImageSet] = useState('')
     const [newRoomRule, setNewRoomRule] = useState('')
+    const [newRoomSizeLimitChecked, setNewRoomSizeLimitChecked] = useState(false);
+    const [newRoomSizeLimit, setNewRoomSizeLimit] = useState('');
     const [labelsSwitchChecked, setLabelsSwitchChecked] = useState(false)
     const [AISwitchChecked, setAISwitchChecked] = useState(false)
 
@@ -62,9 +64,17 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
         }
     }
     const handleClickCreateRoom = () => {
-        socket.emit('createRoom', pseudo, newRoom, parseInt(newRoomRoundDuration), newRoomImageSet, newRoomRule, labelsSwitchChecked, AISwitchChecked, left, right)
+        const sizeLimit = newRoomSizeLimitChecked && newRoomSizeLimit.length > 0 ? parseInt(newRoomSizeLimit) : 1000
+        socket.emit('createRoom', pseudo, newRoom, parseInt(newRoomRoundDuration), newRoomImageSet, newRoomRule, labelsSwitchChecked, AISwitchChecked, sizeLimit, left, right)
         callbackJoinRoom(newRoom)
     }
+
+    const handleCheckboxChange = (event) => {
+        setNewRoomSizeLimitChecked(event.target.checked);
+        if (!event.target.checked) {
+          setNewRoomSizeLimit(''); // Réinitialise l'input quand le checkbox est décoché
+        }
+      };
 
     const downloadImages = (newRoomImageSet: string) => {
         fetch('/images_to_download/' + newRoomImageSet + '.zip').then(response => {
@@ -198,6 +208,28 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                             <Stack direction="row" alignItems="center">
                                 <FormControlLabel control={<Switch checked={AISwitchChecked} onChange={handleAISwitchChange} inputProps={{ 'aria-label': 'controlled' }} />} label="Ajouter une IA comme joueur (beta)" />
                                 <HelpTooltip title="Cocher cette option va ajouter une IA à la liste des joueurs. Elle va s'entraîner à chaque image et faire ses prédictions comme tout autre joueur. Le modèle est un MobileNet-V3-small pré-entrainé identique à celui de Teachable Machine de Google." />
+                            </Stack>
+                            <Stack direction="row" alignItems="center">
+                                <FormControlLabel
+                                    control={
+                                    <Checkbox
+                                        checked={newRoomSizeLimitChecked}
+                                        onChange={handleCheckboxChange}
+                                        color="primary"
+                                    />
+                                    }
+                                    label="Limiter le nombre de joueurs"
+                                />
+                                {newRoomSizeLimitChecked && (
+                                    <TextField
+                                    label="Entrez un nombre"
+                                    type="number"
+                                    value={newRoomSizeLimit}
+                                    onChange={(e) => setNewRoomSizeLimit(e.target.value)}
+                                    variant="outlined"
+                                    margin="normal"
+                                    />
+                                )}
                             </Stack>
                             <TextField required label="Règle d'acceptation" multiline value={newRoomRule} onChange={(e) => setNewRoomRule(e.target.value)} variant="outlined" fullWidth />
                             <Button sx={{ marginTop: 2 }} variant="contained" disabled={pseudo.length === 0 || newRoom.length === 0 || newRoomImageSet.length === 0 || newRoomRoundDuration.length === 0 || newRoomRule.length === 0 || (labelsSwitchChecked && (left.length === 0 || right.length === 0))} onClick={handleClickCreateRoom}>{labelsSwitchChecked ? 'Préparer la room !' : 'Créer la room et superviser !'}</Button>

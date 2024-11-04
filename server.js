@@ -46,7 +46,7 @@ io.on('connection', function (socket) {
         return !roomData.hasStarted;
     }))));
     socket.emit("updateImages", allImages);
-    socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet, rule, autoRun, hasAI, left, right) {
+    socket.on('createRoom', function (pseudo, roomId, roundDuration, imageSet, rule, autoRun, hasAI, sizeLimit, left, right) {
         var _a;
         if (roomId in data) {
             console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " tried to create room ").concat(roomId, " but this room already exists !"));
@@ -69,6 +69,7 @@ io.on('connection', function (socket) {
             timer: roundDuration,
             images: images,
             currentImage: null,
+            sizeLimit: sizeLimit,
             users: __assign((_a = {}, _a[pseudo] = {
                 socketId: socket.id,
                 totalScore: 0,
@@ -98,7 +99,7 @@ io.on('connection', function (socket) {
                 socket.emit('pseudoAlreadyExists');
                 return;
             }
-            if (Object.keys(data[roomId].users).length - 1 >= 40) {
+            if (Object.keys(data[roomId].users).length - 1 >= data[roomId].sizeLimit) {
                 console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " tried to join room ").concat(roomId, " but this room is full !"));
                 socket.emit('roomFull');
                 return;

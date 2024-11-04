@@ -47,6 +47,7 @@ export interface RoomData {
   timer: number,
   images: string[]
   currentImage: string | null,
+  sizeLimit: number,
   users: Users
 }
 
@@ -69,7 +70,7 @@ io.on('connection', (socket: Socket) => {
   socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
   socket.emit("updateImages", allImages)
 
-  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, hasAI: boolean, left: string[], right: string[]) => {
+  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, hasAI: boolean, sizeLimit: number, left: string[], right: string[]) => {
     if (roomId in data) {
       console.log(`User ${socket.id} with pseudo ${pseudo} tried to create room ${roomId} but this room already exists !`)
       socket.emit('roomAlreadyExists')
@@ -91,6 +92,7 @@ io.on('connection', (socket: Socket) => {
       timer: roundDuration,
       images: images,
       currentImage: null,
+      sizeLimit: sizeLimit,
       users: {
         [pseudo]: {
           socketId: socket.id,
@@ -124,7 +126,7 @@ io.on('connection', (socket: Socket) => {
         socket.emit('pseudoAlreadyExists')
         return
       }
-      if (Object.keys(data[roomId].users).length - 1 >= 40) {
+      if (Object.keys(data[roomId].users).length - 1 >= data[roomId].sizeLimit) {
         console.log(`User ${socket.id} with pseudo ${pseudo} tried to join room ${roomId} but this room is full !`)
         socket.emit('roomFull')
         return
