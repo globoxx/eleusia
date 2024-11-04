@@ -98,7 +98,7 @@ io.on('connection', function (socket) {
                 socket.emit('pseudoAlreadyExists');
                 return;
             }
-            if (Object.keys(data[roomId].users).length >= 3) {
+            if (Object.keys(data[roomId].users).length - 1 >= 40) {
                 console.log("User ".concat(socket.id, " with pseudo ").concat(pseudo, " tried to join room ").concat(roomId, " but this room is full !"));
                 socket.emit('roomFull');
                 return;
