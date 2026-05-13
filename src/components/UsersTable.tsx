@@ -6,7 +6,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
-import { User, RoomData } from '../../server';
+import type { User, RoomData } from '../shared/types';
 import { TableFooter, Typography } from '@mui/material';
 
 function UsersTable({roomData, pseudo}: {roomData: RoomData, pseudo: string}) {

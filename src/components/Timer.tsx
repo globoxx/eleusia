@@ -42,11 +42,11 @@ function RenderTime({ remainingTime }: {remainingTime: number}) {
     )
   }
   
-function Timer({key, isPlaying, roundDuration}: {key: number, isPlaying: boolean, roundDuration: number}) {  
+function Timer({timerKey, isPlaying, roundDuration}: {timerKey: number, isPlaying: boolean, roundDuration: number}) {  
     return (
     <div className="timer-wrapper">
         <CountdownCircleTimer
-            key={key}
+            key={timerKey}
             isPlaying={isPlaying}
             duration={roundDuration}
             colors={["#004777", "#F7B801", "#A30000", "#A30000"]}

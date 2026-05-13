@@ -7,7 +7,7 @@ const style = {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     width: 'auto',
-    maxWdith: '90vw',
+    maxWidth: '90vw',
     maxHeight: '90vh',
     overflow: 'auto',
     bgcolor: 'background.paper',
@@ -16,7 +16,7 @@ const style = {
     p: 4,
 }
 
-function ScoreModal({points, open, handleClose}: {points: number, open: boolean, handleClose: any}) {
+function ScoreModal({points, open, handleClose}: {points: number, open: boolean, handleClose: () => void}) {
     
     useEffect(() => {
         if (open) {

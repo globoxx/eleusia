@@ -23,7 +23,7 @@ function union(a: readonly string[], b: readonly string[]) {
   return [...a, ...not(b, a)]
 }
 
-function TransferImage({visible, imagesList, callback}: {visible: boolean, imagesList: string[], callback: any}) {
+function TransferImage({visible, imagesList, callback}: {visible: boolean, imagesList: string[], callback: (left: string[], right: string[]) => void}) {
   const [checked, setChecked] = useState<readonly string[]>([])
   const [left, setLeft] = useState<readonly string[]>(imagesList)
   const [right, setRight] = useState<readonly string[]>([])
@@ -68,7 +68,7 @@ function TransferImage({visible, imagesList, callback}: {visible: boolean, image
   };
 
   useEffect(() => {
-    callback(left, right)
+    callback([...left], [...right])
   }, [callback, left, right])
  
 

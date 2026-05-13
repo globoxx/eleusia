@@ -1,294 +1,442 @@
-import express = require('express')
-import cors = require('cors')
-import { createServer } from "http"
-import { Server, Socket } from "socket.io"
-import path = require('path')
-import * as fs from 'fs'
+import cors from 'cors';
+import express from 'express';
+import * as fs from 'fs';
+import { createServer } from 'http';
+import path from 'path';
+import { Server, Socket } from 'socket.io';
+import type { Data, ImageCatalog } from './src/shared/types';
+import {
+  AI_PSEUDO,
+  ROOM_CLEANUP_DELAY_MS,
+  calculatePoints,
+  countPlayers,
+  createRoomData,
+  getOpenRoomIds,
+  hasHumanUsers,
+  isValidPseudo,
+  isValidRoomId,
+  normalizeVote,
+  validateCreateRoomInput,
+} from './src/server/gameState';
 
-const app = express()
-const httpServer = createServer(app)
-
-const io = new Server(httpServer)
-
-const port = 5000
-const build_path = path.join(__dirname, 'build')
-
-app.use(cors())
-app.use(express.static(build_path))
-app.use('/images', express.static(path.join(build_path, 'images')))
-
-app.get('/', function(_req, res) {
-  res.sendFile(path.join(build_path, 'index.html'))
-})
-
-export interface User {
-  socketId: string,
-  totalScore: number,
-  lastScore: number | null,
-  allScores: number[],
-  vote: number | null
+interface SocketSession {
+  roomId: string;
+  pseudo: string;
 }
 
-export interface Users {
-  [pseudo: string]: User
-}
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+  },
+});
 
-export interface RoomData {
-  rule: string,
-  roundDuration: number,
-  creator: string,
-  autoRun: boolean,
-  hasAI: boolean,
-  paused: boolean,
-  refusedImages: string[],
-  acceptedImages: string[],
-  hasStarted: boolean,
-  hasFinished: boolean,
-  timer: number,
-  images: string[]
-  currentImage: string | null,
-  sizeLimit: number,
-  users: Users
-}
+const port = Number(process.env.PORT) || 5000;
+const buildPath = process.env.BUILD_PATH || path.join(process.cwd(), 'build');
+const imagesFolder = path.join(buildPath, 'images');
 
-export interface Data {
-  [roomId: string]: RoomData
-}
+app.use(cors());
+app.use(express.static(buildPath));
+app.use('/images', express.static(imagesFolder));
 
-const data: Data = {}
+app.get('*', function (_req, res) {
+  res.sendFile(path.join(buildPath, 'index.html'));
+});
 
-const imagesFolder = path.join(build_path, 'images')
-const imageFolders = fs.readdirSync(imagesFolder)
-const allImages: {[folder: string]: string[]} = {}
-for (const imageFolder of imageFolders) {
-  allImages[imageFolder] = fs.readdirSync(path.join(imagesFolder, imageFolder)).filter((file: string) => file.endsWith('.png') || file.endsWith('.jpg')).map((file: string) => path.join('images', imageFolder, file))
-}
+const data: Data = {};
+const sessions = new Map<string, SocketSession>();
+const cleanupTimers = new Map<string, NodeJS.Timeout>();
+const allImages = readImageCatalog(imagesFolder);
 
 io.on('connection', (socket: Socket) => {
-  //console.log(`User connected: ${socket.id}`)
+  socket.emit('updateRooms', getOpenRoomIds(data));
+  socket.emit('updateImages', allImages);
 
-  socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
-  socket.emit("updateImages", allImages)
+  socket.on(
+    'createRoom',
+    (
+      pseudo: unknown,
+      roomId: unknown,
+      roundDuration: unknown,
+      imageSet: unknown,
+      rule: unknown,
+      autoRun: unknown,
+      hasAI: unknown,
+      sizeLimit: unknown,
+      left: unknown,
+      right: unknown,
+    ) => {
+      const input = {
+        pseudo,
+        roomId,
+        roundDuration,
+        imageSet,
+        rule,
+        autoRun,
+        hasAI,
+        sizeLimit,
+        refusedImages: left,
+        acceptedImages: right,
+      };
 
-  socket.on('createRoom', (pseudo: string, roomId: string, roundDuration: number, imageSet: string, rule: string, autoRun: boolean, hasAI: boolean, sizeLimit: number, left: string[], right: string[]) => {
-    if (roomId in data) {
-      console.log(`User ${socket.id} with pseudo ${pseudo} tried to create room ${roomId} but this room already exists !`)
-      socket.emit('roomAlreadyExists')
-      return
-    }
-    console.log(`User ${socket.id} with pseudo ${pseudo} created new room ${roomId} with autorun: ${autoRun}`)
-    const images = allImages[imageSet]
-    data[roomId] = {
-      rule: rule,
-      roundDuration: roundDuration,
-      creator: pseudo,
-      autoRun: autoRun,
-      hasAI: hasAI,
-      paused: false,
-      refusedImages: left,
-      acceptedImages: right,
-      hasStarted: false,
-      hasFinished: false,
-      timer: roundDuration,
-      images: images,
-      currentImage: null,
-      sizeLimit: sizeLimit,
-      users: {
-        [pseudo]: {
-          socketId: socket.id,
-          totalScore: 0,
-          lastScore: null,
-          allScores: [],
-          vote: null
-        },
-        ...(hasAI && {'Eleus-IA': {
-          socketId: '0',
-          totalScore: 0,
-          lastScore: null,
-          allScores: [],
-          vote: null
-        }})
+      if (!isCreateRoomPayload(input)) {
+        reject(socket, 'invalidRoom');
+        return;
       }
-    }
 
-    socket.join(roomId)
-
-    io.in(roomId).emit('updateRoomData', data[roomId])
-
-    io.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
-    console.log(`List of rooms ${Object.keys(data).toString()}`)
-  })
-
-  socket.on('joinRoom', (roomId: string, pseudo: string) => {
-    if (roomId in data) {
-      if (pseudo in data[roomId].users) {
-        console.log(`User ${socket.id} with pseudo ${pseudo} tried to join room ${roomId} but this pseudo already exists !`)
-        socket.emit('pseudoAlreadyExists')
-        return
+      const validation = validateCreateRoomInput(input, allImages);
+      if (!validation.ok) {
+        reject(socket, validation.reason);
+        return;
       }
-      if (Object.keys(data[roomId].users).length - 1 >= data[roomId].sizeLimit) {
-        console.log(`User ${socket.id} with pseudo ${pseudo} tried to join room ${roomId} but this room is full !`)
-        socket.emit('roomFull')
-        return
+
+      if (input.roomId in data) {
+        socket.emit('roomAlreadyExists');
+        return;
       }
-      console.log(`User ${socket.id} with pseudo ${pseudo} joined room ${roomId}`)
-      socket.join(roomId)
-      data[roomId].users[pseudo] = {
-        socketId: socket.id,
-        totalScore: 0,
-        lastScore: null,
-        allScores: [],
-        vote: null
+
+      if (sessions.has(socket.id)) {
+        reject(socket, 'alreadyInRoom');
+        return;
       }
-      io.in(roomId).emit('updateRoomData', data[roomId])
-    } else {
-      console.log(`ROOM WITH ID ${roomId} NOT FOUND`)
-    }
-  })
 
-  socket.on('startGame', (roomId: string) => {
-    console.log(`Game started in room ${roomId}`)
-    if (roomId in data) {
-        data[roomId].hasStarted = true
-        startNewRound(roomId)
-    } else {
-        console.log(`Game started in room ${roomId} but this room does not exist !`)
-    }
-  })
+      data[input.roomId] = createRoomData(input, socket.id, allImages);
+      sessions.set(socket.id, { roomId: input.roomId, pseudo: input.pseudo });
+      socket.join(input.roomId);
+      cancelRoomCleanup(input.roomId);
 
-  socket.on('vote', (roomId: string, pseudo: string, vote: number) => {
-    console.log(`In room ${roomId}, ${pseudo} voted ${vote}`)
-    if (pseudo in data[roomId].users) {
-      data[roomId].users[pseudo].vote = vote
-      io.in(roomId).emit('updateRoomData', data[roomId])
-    } else {
-      console.log(`ERROR, ${pseudo} NOT IN ROOM`)
-    }
-  })
+      emitRoomData(input.roomId);
+      emitRooms();
+    },
+  );
 
-  socket.on('endGame', (roomId: string) => {
-    console.log(`The creator ended the game in room ${roomId}`)
-    data[roomId].hasFinished = true
-    io.in(roomId).emit('updateRoomData', data[roomId])
-  })
-
-  socket.on('leaveRoom', (roomId: string, pseudo: string) => {
-    console.log(`User ${pseudo} with socket id ${socket.id} left room ${roomId}`)
-    socket.leave(roomId)
-
-    // Remove the user associated to the socket from the data
-    for (const roomId of Object.keys(data)) {
-      for (const userPseudo of Object.keys(data[roomId].users)) {
-        if (userPseudo === pseudo) {
-          delete data[roomId].users[userPseudo]
-          io.in(roomId).emit('updateRoomData', data[roomId])
-          if (data[roomId].hasStarted && userPseudo === data[roomId].creator && !data[roomId].autoRun) {
-            // The creator left the room, game over
-            data[roomId].hasFinished = true
-          }
-        }
-      }
+  socket.on('joinRoom', (roomId: unknown, pseudo: unknown) => {
+    if (!isValidRoomId(roomId) || !isValidPseudo(pseudo)) {
+      reject(socket, 'invalidJoin');
+      return;
     }
 
-    socket.emit("updateRooms", Object.keys(Object.fromEntries(Object.entries(data).filter(([, roomData]) => !roomData.hasStarted))))
-    io.in(roomId).emit('updateRoomData', data[roomId])
-  })
-
-  socket.on('pause', (roomId: string) => {
-    if (!data[roomId].paused) {
-      console.log(`The room ${roomId} is posed`)
-    } else {
-      console.log(`The room ${roomId} resumes`)
+    const roomData = data[roomId];
+    if (!roomData || roomData.hasStarted) {
+      reject(socket, 'roomNotFound');
+      return;
     }
-    
-    data[roomId].paused = !data[roomId].paused
-    io.in(roomId).emit('updateRoomData', data[roomId])
-  })
+
+    if (pseudo in roomData.users) {
+      socket.emit('pseudoAlreadyExists');
+      return;
+    }
+
+    if (countPlayers(roomData) >= roomData.sizeLimit) {
+      socket.emit('roomFull');
+      return;
+    }
+
+    if (sessions.has(socket.id)) {
+      reject(socket, 'alreadyInRoom');
+      return;
+    }
+
+    roomData.users[pseudo] = {
+      socketId: socket.id,
+      totalScore: 0,
+      lastScore: null,
+      allScores: [],
+      vote: null,
+    };
+    sessions.set(socket.id, { roomId, pseudo });
+    socket.join(roomId);
+    cancelRoomCleanup(roomId);
+
+    emitRoomData(roomId);
+  });
+
+  socket.on('startGame', (roomId: unknown) => {
+    if (!isCreatorSocket(socket, roomId)) {
+      reject(socket, 'notRoomCreator');
+      return;
+    }
+
+    const roomData = data[roomId];
+    if (!roomData || roomData.hasStarted || roomData.hasFinished) return;
+
+    roomData.hasStarted = true;
+    emitRooms();
+    startNewRound(roomId);
+  });
+
+  socket.on('vote', (roomId: unknown, rawVote: unknown) => {
+    if (!isValidRoomId(roomId)) {
+      reject(socket, 'invalidRoom');
+      return;
+    }
+
+    const session = sessions.get(socket.id);
+    const roomData = data[roomId];
+    const vote = normalizeVote(rawVote);
+    if (!session || session.roomId !== roomId || !roomData || vote === null) {
+      reject(socket, 'invalidVote');
+      return;
+    }
+
+    const user = roomData.users[session.pseudo];
+    if (!user || user.socketId !== socket.id || roomData.hasFinished) {
+      reject(socket, 'invalidVote');
+      return;
+    }
+
+    user.vote = vote;
+    emitRoomData(roomId);
+  });
+
+  socket.on('aiVote', (roomId: unknown, rawVote: unknown) => {
+    if (!isCreatorSocket(socket, roomId)) {
+      reject(socket, 'notRoomCreator');
+      return;
+    }
+
+    const roomData = data[roomId];
+    const vote = normalizeVote(rawVote);
+    if (!roomData?.hasAI || vote === null || !roomData.users[AI_PSEUDO]) {
+      reject(socket, 'invalidAiVote');
+      return;
+    }
+
+    roomData.users[AI_PSEUDO].vote = vote;
+    emitRoomData(roomId);
+  });
+
+  socket.on('endGame', (roomId: unknown) => {
+    if (!isCreatorSocket(socket, roomId)) {
+      reject(socket, 'notRoomCreator');
+      return;
+    }
+
+    const roomData = data[roomId];
+    if (!roomData) return;
+
+    roomData.hasFinished = true;
+    roomData.paused = false;
+    emitRoomData(roomId);
+    scheduleRoomCleanup(roomId);
+  });
+
+  socket.on('leaveRoom', (roomId: unknown) => {
+    if (!isValidRoomId(roomId)) {
+      reject(socket, 'invalidRoom');
+      return;
+    }
+
+    removeSocketFromRoom(socket);
+  });
+
+  socket.on('pause', (roomId: unknown) => {
+    if (!isCreatorSocket(socket, roomId)) {
+      reject(socket, 'notRoomCreator');
+      return;
+    }
+
+    const roomData = data[roomId];
+    if (!roomData || roomData.hasFinished) return;
+
+    roomData.paused = !roomData.paused;
+    emitRoomData(roomId);
+  });
 
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`)
+    removeSocketFromRoom(socket);
+  });
+});
 
-    // Remove the user associated to the socket from the data
-    let roomIdOfUser
-    for (const roomId of Object.keys(data)) {
-      for (const userPseudo of Object.keys(data[roomId].users)) {
-        if (data[roomId].users[userPseudo].socketId === socket.id) {
-          roomIdOfUser = roomId
-          delete data[roomId].users[userPseudo]
-          io.in(roomId).emit('updateRoomData', data[roomId])
-          if (data[roomId].hasStarted && userPseudo === data[roomId].creator && !data[roomId].autoRun) {
-            // The creator left the room, game over
-            data[roomId].hasFinished = true
-          }
-        }
-      }
-    }
+function readImageCatalog(rootFolder: string): ImageCatalog {
+  const catalog: ImageCatalog = {};
+  const imageFolders = fs.readdirSync(rootFolder, { withFileTypes: true }).filter((entry) => entry.isDirectory());
 
-    io.in(roomIdOfUser).emit('updateRoomData', data[roomIdOfUser])
-  })
-})
-
-function startNewRound(roomId: string) {
-  const room_images = data[roomId].images
-  
-  if (room_images.length > 0) {
-    console.log(`New round in room ${roomId}.`)
-    const random_image = room_images[Math.floor(Math.random() * room_images.length)]
-    data[roomId].currentImage = random_image
-
-    // Remove the image from the list
-    data[roomId].images = data[roomId].images.filter(img => img !== random_image)
-
-    // Emit the random image path to all clients in the room
-    io.in(roomId).emit('newRound', random_image)
-
-    // Reset votes and update users
-    for (const user_pseudo of Object.keys(data[roomId].users)) {
-      data[roomId].users[user_pseudo].vote = null
-    }
-
-    data[roomId].timer = data[roomId].roundDuration
-  } else {
-    console.log(`No more images in room ${roomId}.`)
-    data[roomId].hasFinished = true
+  for (const imageFolder of imageFolders) {
+    catalog[imageFolder.name] = fs
+      .readdirSync(path.join(rootFolder, imageFolder.name))
+      .filter((file) => file.endsWith('.png') || file.endsWith('.jpg'))
+      .map((file) => ['images', imageFolder.name, file].join('/'));
   }
 
-  io.in(roomId).emit('updateRoomData', data[roomId])
+  return catalog;
 }
 
-setInterval(function(){
-  for (const roomId of Object.keys(data)) {
-    if (data[roomId].hasStarted && !data[roomId].hasFinished && !data[roomId].paused) {
-      data[roomId].timer--
-      if (Object.values(data[roomId].users).map(user => user.vote).every(vote => vote !== null)) {
-        data[roomId].timer = 0
-      }
-      if (data[roomId].timer <= 0) {
-        const creator = data[roomId].creator
-        const creatorVote = data[roomId].users[creator]?.vote
+function isCreateRoomPayload(input: {
+  pseudo: unknown;
+  roomId: unknown;
+  roundDuration: unknown;
+  imageSet: unknown;
+  rule: unknown;
+  autoRun: unknown;
+  hasAI: unknown;
+  sizeLimit: unknown;
+  refusedImages: unknown;
+  acceptedImages: unknown;
+}): input is {
+  pseudo: string;
+  roomId: string;
+  roundDuration: number;
+  imageSet: string;
+  rule: string;
+  autoRun: boolean;
+  hasAI: boolean;
+  sizeLimit: number;
+  refusedImages: string[];
+  acceptedImages: string[];
+} {
+  return (
+    typeof input.pseudo === 'string' &&
+    typeof input.roomId === 'string' &&
+    typeof input.roundDuration === 'number' &&
+    typeof input.imageSet === 'string' &&
+    typeof input.rule === 'string' &&
+    typeof input.autoRun === 'boolean' &&
+    typeof input.hasAI === 'boolean' &&
+    typeof input.sizeLimit === 'number' &&
+    Array.isArray(input.refusedImages) &&
+    input.refusedImages.every((image) => typeof image === 'string') &&
+    Array.isArray(input.acceptedImages) &&
+    input.acceptedImages.every((image) => typeof image === 'string')
+  );
+}
 
-        if (creatorVote != null) {
-          const usersPoints: {[pseudo: string]: number} = {}
-          for (const userPseudo of Object.keys(data[roomId].users)) {
-            if (userPseudo !== creator) {
-              const userVote = data[roomId].users[userPseudo].vote ?? 0
-              const points = Math.round((1 - Math.abs(creatorVote - userVote)) * 100)
-              data[roomId].users[userPseudo].lastScore = points
-              data[roomId].users[userPseudo].allScores.push(points)
-              data[roomId].users[userPseudo].totalScore += points
-              usersPoints[userPseudo] = points
-            }
-          }
-          io.in(roomId).emit('endOfRound', usersPoints, creatorVote)
-          startNewRound(roomId)
-        } else {
-          //console.log('CREATOR VOTE IS NULL, WAIT ON HIM')
-          io.in(roomId).emit('waitCreator')
-        }
-      }
-      io.in(roomId).emit('timer', data[roomId].timer)
-    }
+function emitRooms() {
+  io.emit('updateRooms', getOpenRoomIds(data));
+}
+
+function emitRoomData(roomId: string) {
+  const roomData = data[roomId];
+  if (roomData) io.in(roomId).emit('updateRoomData', roomData);
+}
+
+function reject(socket: Socket, reason: string) {
+  socket.emit('actionRejected', reason);
+}
+
+function isCreatorSocket(socket: Socket, roomId: unknown): roomId is string {
+  if (!isValidRoomId(roomId)) return false;
+
+  const session = sessions.get(socket.id);
+  const roomData = data[roomId];
+  return Boolean(session && roomData && session.roomId === roomId && roomData.creator === session.pseudo);
+}
+
+function removeSocketFromRoom(socket: Socket) {
+  const session = sessions.get(socket.id);
+  if (!session) return;
+
+  sessions.delete(socket.id);
+  socket.leave(session.roomId);
+
+  const roomData = data[session.roomId];
+  if (!roomData) return;
+
+  const user = roomData.users[session.pseudo];
+  if (user?.socketId === socket.id) {
+    delete roomData.users[session.pseudo];
   }
-}, 1000)
 
-httpServer.listen(port, () => console.log(`Listening on port ${port.toString()}`))
+  if (session.pseudo === roomData.creator) {
+    roomData.hasFinished = true;
+    roomData.paused = false;
+  }
+
+  if (!hasHumanUsers(roomData) || roomData.hasFinished) {
+    scheduleRoomCleanup(session.roomId);
+  }
+
+  emitRoomData(session.roomId);
+  emitRooms();
+}
+
+function scheduleRoomCleanup(roomId: string) {
+  cancelRoomCleanup(roomId);
+
+  const timer = setTimeout(() => {
+    delete data[roomId];
+    cleanupTimers.delete(roomId);
+    emitRooms();
+  }, ROOM_CLEANUP_DELAY_MS);
+
+  timer.unref?.();
+  cleanupTimers.set(roomId, timer);
+}
+
+function cancelRoomCleanup(roomId: string) {
+  const timer = cleanupTimers.get(roomId);
+  if (!timer) return;
+
+  clearTimeout(timer);
+  cleanupTimers.delete(roomId);
+}
+
+function startNewRound(roomId: string) {
+  const roomData = data[roomId];
+  if (!roomData) return;
+
+  if (roomData.images.length === 0) {
+    roomData.hasFinished = true;
+    roomData.paused = false;
+    emitRoomData(roomId);
+    scheduleRoomCleanup(roomId);
+    return;
+  }
+
+  const randomIndex = Math.floor(Math.random() * roomData.images.length);
+  const randomImage = roomData.images[randomIndex];
+  if (!randomImage) return;
+
+  roomData.currentImage = randomImage;
+  roomData.images = roomData.images.filter((img) => img !== randomImage);
+
+  for (const user of Object.values(roomData.users)) {
+    user.vote = null;
+  }
+
+  roomData.timer = roomData.roundDuration;
+  io.in(roomId).emit('newRound', randomImage);
+  emitRoomData(roomId);
+}
+
+setInterval(function () {
+  for (const roomId of Object.keys(data)) {
+    const roomData = data[roomId];
+    if (!roomData.hasStarted || roomData.hasFinished || roomData.paused) continue;
+
+    roomData.timer -= 1;
+    if (Object.values(roomData.users).every((user) => user.vote !== null)) {
+      roomData.timer = 0;
+    }
+
+    if (roomData.timer <= 0) {
+      const creatorVote = roomData.users[roomData.creator]?.vote;
+
+      if (creatorVote !== null && creatorVote !== undefined) {
+        const usersPoints: Record<string, number> = {};
+
+        for (const [userPseudo, user] of Object.entries(roomData.users)) {
+          if (userPseudo === roomData.creator) continue;
+
+          const userVote = user.vote ?? 0;
+          const points = calculatePoints(creatorVote, userVote);
+          user.lastScore = points;
+          user.allScores.push(points);
+          user.totalScore += points;
+          usersPoints[userPseudo] = points;
+        }
+
+        io.in(roomId).emit('endOfRound', usersPoints, creatorVote);
+        startNewRound(roomId);
+      } else {
+        io.in(roomId).emit('waitCreator');
+      }
+    }
+
+    io.in(roomId).emit('timer', roomData.timer);
+  }
+}, 1000);
+
+httpServer.listen(port, () => console.log(`Listening on port ${port.toString()}`));

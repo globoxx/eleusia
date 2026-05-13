@@ -7,7 +7,7 @@ const style = {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     width: 800,
-    maxWdith: '90vw',
+    maxWidth: '90vw',
     maxHeight: '90vh',
     overflow: 'auto',
     bgcolor: 'background.paper',
@@ -16,7 +16,7 @@ const style = {
     p: 4,
 }
 
-function RulesModal({open, handleClose}: {open: boolean, handleClose: any}) {
+function RulesModal({open, handleClose}: {open: boolean, handleClose: () => void}) {
     return (
         <Modal
             open={open}

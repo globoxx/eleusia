@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { io, Socket } from "socket.io-client";
 import GameBoard from './components/GameBoard';
 import Home from './components/Home'
-import { RoomData } from '../server';
+import type { RoomData } from './shared/types';
 import { Alert, Box, Snackbar } from '@mui/material';
 
 const socket: Socket = io()

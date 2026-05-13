@@ -2,7 +2,7 @@ import { Modal, Box, Typography, Backdrop, Fade, Button } from "@mui/material"
 import { HomeOutlined } from '@mui/icons-material'
 import React from "react"
 import ScoreChart from "../ScoreChart"
-import { User } from "../../../server"
+import type { User } from "../../shared/types"
 
 const style = {
     position: 'absolute' as 'absolute',
@@ -10,7 +10,7 @@ const style = {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     width: 800,
-    maxWdith: '90vw',
+    maxWidth: '90vw',
     maxHeight: '90vh',
     overflow: 'auto',
     bgcolor: 'background.paper',
