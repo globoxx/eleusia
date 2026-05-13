@@ -34,15 +34,22 @@ const io = new Server(httpServer, {
 });
 
 const port = Number(process.env.PORT) || 5000;
-const buildPath = process.env.BUILD_PATH || path.join(process.cwd(), 'build');
-const imagesFolder = path.join(buildPath, 'images');
+const buildPath = process.env.BUILD_PATH || path.join(process.cwd(), 'dist', 'client');
+const staticPath = fs.existsSync(buildPath) ? buildPath : path.join(process.cwd(), 'public');
+const imagesFolder = path.join(staticPath, 'images');
 
 app.use(cors());
-app.use(express.static(buildPath));
+app.use(express.static(staticPath));
 app.use('/images', express.static(imagesFolder));
 
 app.get('*', function (_req, res) {
-  res.sendFile(path.join(buildPath, 'index.html'));
+  const indexPath = path.join(staticPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+    return;
+  }
+
+  res.status(404).send('Client build not found. Run npm run build or use npm run start:client.');
 });
 
 const data: Data = {};

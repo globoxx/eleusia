@@ -4,7 +4,7 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "rootDir": ".",
-    "outDir": "dist",
+    "outDir": "dist/server",
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,

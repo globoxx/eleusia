@@ -1,14 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
+import { vi } from 'vitest';
 import App from './App';
 
-jest.mock('socket.io-client', () => ({
+vi.mock('socket.io-client', () => ({
   io: () => ({
     id: 'socket-1',
-    connect: jest.fn(),
-    emit: jest.fn(),
-    on: jest.fn(),
-    off: jest.fn(),
+    connect: vi.fn(),
+    emit: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
   }),
 }));
 

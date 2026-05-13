@@ -1,11 +1,14 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import type { Socket } from 'socket.io-client';
+import { vi } from 'vitest';
 import type { RoomData } from '../shared/types';
 import GameBoard from './GameBoard';
 
-jest.mock('./Timer', () => () => <div data-testid="timer" />);
-jest.mock('mui-image', () => ({
+vi.mock('./Timer', () => ({
+  default: () => <div data-testid="timer" />,
+}));
+vi.mock('mui-image', () => ({
   Image: ({ src }: { src: string }) => <img alt="current round" src={src} />,
 }));
 
@@ -13,10 +16,10 @@ type Handler = (...args: unknown[]) => void;
 
 function createSocketMock() {
   const handlers: Record<string, Handler> = {};
-  const socket: { emit: jest.Mock; on: jest.Mock; off: jest.Mock } = {
-    emit: jest.fn(),
-    on: jest.fn(),
-    off: jest.fn(),
+  const socket = {
+    emit: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
   };
 
   socket.on.mockImplementation((event: string, handler: Handler) => {
@@ -70,7 +73,7 @@ function createRoomData(overrides: Partial<RoomData> = {}): RoomData {
 test('player vote emits room and vote only', () => {
   const { socket, emit, handlers } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createRoomData()} callbackLeaveRoom={jest.fn()} />);
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createRoomData()} callbackLeaveRoom={vi.fn()} />);
 
   act(() => {
     handlers.newRound?.('images/cards/1.png');
@@ -86,7 +89,7 @@ test('player vote emits room and vote only', () => {
 test('creator controls pause and reveal actions', () => {
   const { socket, emit } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="Teacher" room="room1" roomData={createRoomData()} callbackLeaveRoom={jest.fn()} />);
+  render(<GameBoard socket={socket} pseudo="Teacher" room="room1" roomData={createRoomData()} callbackLeaveRoom={vi.fn()} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
   fireEvent.click(screen.getByRole('button', { name: 'Révéler la règle' }));
