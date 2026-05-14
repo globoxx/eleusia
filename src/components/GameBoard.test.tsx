@@ -8,9 +8,6 @@ import GameBoard from './GameBoard';
 vi.mock('./Timer', () => ({
   default: () => <div data-testid="timer" />,
 }));
-vi.mock('mui-image', () => ({
-  Image: ({ src }: { src: string }) => <img alt="current round" src={src} />,
-}));
 
 type Handler = (...args: unknown[]) => void;
 
@@ -79,6 +76,8 @@ test('player vote emits room and vote only', () => {
     handlers.newRound?.('images/cards/1.png');
     handlers.timer?.(10);
   });
+
+  expect(screen.getByRole('img', { name: 'Image courante' })).toHaveAttribute('src', 'images/cards/1.png');
 
   fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
 

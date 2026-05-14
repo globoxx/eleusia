@@ -38,15 +38,15 @@ function RulesModal({open, handleClose}: {open: boolean, handleClose: () => void
                         <Typography variant="h3" align="center">Eleus-IA: Dans la peau d'une IA</Typography>
                     </Grid>
                     <Grid item xs={12}>
-                        <Typography variant="h4" paragraph>But du jeu:</Typography>
-                        <Typography variant="body1" paragraph component="ol">
+                        <Typography variant="h4" sx={{ mb: 2 }}>But du jeu:</Typography>
+                        <Typography variant="body1" sx={{ mb: 2 }} component="ol">
                             En rejoignant une room, vous rejoindrez d'autres joueurs dont l'objectif est d'apprendre à catégoriser des images qui vous seront présentées successivement.
                             La catégorie de chaque image est fixée selon une règle secrète décidée par le créateur de la room qui fait office de superviseur.<br />
                             Votre objectif est de deviner la catégorie de chaque image et de voter pour la catégorie que vous pensez être la bonne. A chaque vote, vous gagnerez ou perdrez des points en fonction de la justesse de votre prédiction.
                             Le but du jeu est d'obtenir le plus de points possible.
                         </Typography>
-                        <Typography variant="h4" paragraph>Objectif pédagogique:</Typography>
-                        <Typography variant="body1" paragraph component="ol">
+                        <Typography variant="h4" sx={{ mb: 2 }}>Objectif pédagogique:</Typography>
+                        <Typography variant="body1" sx={{ mb: 2 }} component="ol">
                             Le jeu a pour objectif de faire découvrir aux joueurs le fonctionnement de l'apprentissage supervisé.
                             Chaque joueur joue le rôle d'une IA qui doit apprendre à catégoriser des images selon une règle secrète.
                             L'amélioration des prédictions passe donc uniquement par l'observation de la justesse des prédictions précédentes.<br />

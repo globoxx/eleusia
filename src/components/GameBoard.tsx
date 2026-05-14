@@ -3,7 +3,6 @@ import PlayCircleFilledIcon from '@mui/icons-material/PlayCircleFilled';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { Box, Grid, Paper, Slider, Stack, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
-import { Image as MuiImage } from 'mui-image';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import type { RoomData } from '../shared/types';
@@ -250,7 +249,16 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
             </Grid>
           </Grid>
           <Grid container item alignItems="center" justifyContent="center">
-            <Box sx={{ height: 200 }}>{currentImage ? <MuiImage src={currentImage} duration={1000} height={200} /> : null}</Box>
+            <Box sx={{ height: 200 }}>
+              {currentImage ? (
+                <Box
+                  component="img"
+                  src={currentImage}
+                  alt="Image courante"
+                  sx={{ display: 'block', height: 200, maxWidth: '100%', objectFit: 'contain' }}
+                />
+              ) : null}
+            </Box>
           </Grid>
           <Grid container item textAlign="center" alignItems="center">
             {isRoomCreator ? (
