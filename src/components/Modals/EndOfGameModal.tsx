@@ -2,7 +2,7 @@ import { Modal, Box, Typography, Backdrop, Fade, Button } from "@mui/material"
 import { HomeOutlined } from '@mui/icons-material'
 import React from "react"
 import ScoreChart from "../ScoreChart"
-import type { User } from "../../shared/types"
+import type { PublicUser } from "../../shared/types"
 
 const style = {
     position: 'absolute' as 'absolute',
@@ -19,7 +19,7 @@ const style = {
     p: 4,
 }
 
-function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, labels}: {rule: string, open: boolean, users: {[pseudo: string]: User}, pseudo: string, creatorPseudo: string, images: string[], labels: string[]}) {
+function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, labels}: {rule: string, open: boolean, users: {[pseudo: string]: PublicUser}, pseudo: string, creatorPseudo: string, images: string[], labels: string[]}) {
     const scores: {[pseudo: string]: number[]} = Object.assign({}, ...Object.entries(users).filter(([pseudo,]) => pseudo !== creatorPseudo).map(([pseudo, user]) => ({[pseudo]: user.allScores})))
     const scoresReadyToShow = open && Object.keys(scores).length > 0 && Object.values(scores).every(userScores => userScores.length > 0)
     return (

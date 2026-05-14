@@ -23,7 +23,7 @@ import {
 import type { SelectChangeEvent } from '@mui/material';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import type { ImageCatalog } from '../shared/types';
+import type { CreateRoomPayload, ImageCatalog, JoinRoomPayload, RoomAck } from '../shared/types';
 import HelpTooltip from './HelpTooltip';
 import RulesModal from './Modals/RulesModal';
 import TransferImage from './TransferImage';
@@ -32,7 +32,7 @@ type HomeProps = {
   socket: Socket;
   callbackPseudoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   callbackRoomChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  callbackJoinRoom: (room: string) => void;
+  callbackJoinRoom: (room: string, pseudo: string, participantToken: string) => void;
 };
 
 function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoom }: HomeProps) {
@@ -74,8 +74,15 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
 
   const handleClickJoinRoom = () => {
     if (pseudo && room && rooms.includes(room)) {
-      socket.emit('joinRoom', room, pseudo);
-      callbackJoinRoom(room);
+      const payload: JoinRoomPayload = { roomId: room, pseudo };
+      socket.emit('joinRoom', payload, (ack: RoomAck) => {
+        if (ack.ok) {
+          callbackJoinRoom(ack.roomId, ack.pseudo, ack.participantToken);
+          return;
+        }
+
+        alert(getRejectionMessage(ack.reason));
+      });
       return;
     }
 
@@ -88,20 +95,27 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
 
   const handleClickCreateRoom = () => {
     const sizeLimit = newRoomSizeLimitChecked && newRoomSizeLimit.length > 0 ? parseInt(newRoomSizeLimit, 10) : 1000;
-    socket.emit(
-      'createRoom',
+    const payload: CreateRoomPayload = {
       pseudo,
-      newRoom,
-      parseInt(newRoomRoundDuration, 10),
-      newRoomImageSet,
-      newRoomRule,
-      labelsSwitchChecked,
-      AISwitchChecked,
+      roomId: newRoom,
+      roundDuration: parseInt(newRoomRoundDuration, 10),
+      imageSet: newRoomImageSet,
+      rule: newRoomRule,
+      autoRun: labelsSwitchChecked,
+      hasAI: AISwitchChecked,
       sizeLimit,
-      left,
-      right,
-    );
-    callbackJoinRoom(newRoom);
+      refusedImages: left,
+      acceptedImages: right,
+    };
+
+    socket.emit('createRoom', payload, (ack: RoomAck) => {
+      if (ack.ok) {
+        callbackJoinRoom(ack.roomId, ack.pseudo, ack.participantToken);
+        return;
+      }
+
+      alert(getRejectionMessage(ack.reason));
+    });
   };
 
   const handleCheckboxChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -297,6 +311,26 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
       <RulesModal open={isRulesModalOpen} handleClose={() => setIsRulesModalOpen(false)} />
     </>
   );
+}
+
+function getRejectionMessage(reason: string) {
+  const messages: Record<string, string> = {
+    invalidPseudo: 'Pseudo invalide.',
+    invalidRoom: 'Room invalide.',
+    invalidRule: 'Règle invalide ou trop longue.',
+    invalidRoundDuration: 'Durée de round invalide.',
+    invalidSizeLimit: 'Limite de joueurs invalide.',
+    invalidImageSet: "Jeu d'images invalide.",
+    invalidLabels: 'Labels invalides.',
+    incompleteLabels: 'Toutes les images doivent être classées une seule fois.',
+    roomAlreadyExists: 'Ce numéro de room existe déjà.',
+    pseudoAlreadyExists: 'Ce pseudo existe déjà dans cette room.',
+    roomFull: 'Cette room est déjà pleine.',
+    roomNotFound: "Cette room n'existe pas ou a déjà commencé.",
+    alreadyInRoom: 'Vous êtes déjà dans une room.',
+  };
+
+  return messages[reason] ?? 'Action refusée par le serveur.';
 }
 
 export default Home;

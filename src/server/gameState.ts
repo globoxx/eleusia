@@ -1,10 +1,14 @@
-import type { ImageCatalog, RoomData, User } from '../shared/types';
+import type { ClientRoomData, CreatorRoomData, ImageCatalog, PublicRoomData, PublicUser, RoomData, User } from '../shared/types';
 
 export const AI_PSEUDO = 'Eleus-IA';
 export const AI_SOCKET_ID = 'ai';
 export const ROOM_CLEANUP_DELAY_MS = 60 * 60 * 1000;
+export const RECONNECT_GRACE_MS = 2 * 60 * 1000;
 export const MAX_ROOM_ID_LENGTH = 64;
 export const MAX_PSEUDO_LENGTH = 15;
+export const MAX_RULE_LENGTH = 500;
+export const MIN_ROUND_DURATION = 5;
+export const MAX_ROUND_DURATION = 120;
 export const MAX_SIZE_LIMIT = 1000;
 
 export interface CreateRoomInput {
@@ -45,7 +49,12 @@ export function isValidRoomId(roomId: unknown): roomId is string {
 }
 
 export function isValidRoundDuration(roundDuration: unknown): roundDuration is number {
-  return typeof roundDuration === 'number' && Number.isFinite(roundDuration) && roundDuration > 0;
+  return (
+    typeof roundDuration === 'number' &&
+    Number.isInteger(roundDuration) &&
+    roundDuration >= MIN_ROUND_DURATION &&
+    roundDuration <= MAX_ROUND_DURATION
+  );
 }
 
 export function isValidSizeLimit(sizeLimit: unknown): sizeLimit is number {
@@ -62,18 +71,22 @@ export function calculatePoints(creatorVote: number, userVote: number): number {
   return Math.max(-100, Math.min(100, rawPoints));
 }
 
-export function createUser(socketId: string): User {
+export function createUser(socketId: string, participantToken: string | null = null): User {
   return {
     socketId,
+    participantToken,
+    connected: true,
+    disconnectedAt: null,
     totalScore: 0,
     lastScore: null,
     allScores: [],
     vote: null,
+    voteRoundId: null,
   };
 }
 
 export function countPlayers(roomData: RoomData): number {
-  return Object.keys(roomData.users).length - 1;
+  return Object.keys(roomData.users).filter((pseudo) => pseudo !== roomData.creator && pseudo !== AI_PSEUDO).length;
 }
 
 export function hasHumanUsers(roomData: RoomData): boolean {
@@ -91,7 +104,7 @@ export function validateCreateRoomInput(input: CreateRoomInput, allImages: Image
   if (!isValidRoomId(input.roomId)) return { ok: false, reason: 'invalidRoom' };
   if (!isValidRoundDuration(input.roundDuration)) return { ok: false, reason: 'invalidRoundDuration' };
   if (!isValidSizeLimit(input.sizeLimit)) return { ok: false, reason: 'invalidSizeLimit' };
-  if (typeof input.rule !== 'string' || input.rule.trim().length === 0) {
+  if (typeof input.rule !== 'string' || input.rule.trim().length === 0 || input.rule.length > MAX_RULE_LENGTH) {
     return { ok: false, reason: 'invalidRule' };
   }
 
@@ -100,34 +113,94 @@ export function validateCreateRoomInput(input: CreateRoomInput, allImages: Image
     return { ok: false, reason: 'invalidImageSet' };
   }
 
-  const imageSet = new Set(images);
-  const labelsAreValid = [...input.refusedImages, ...input.acceptedImages].every((image) => imageSet.has(image));
-  if (!labelsAreValid) return { ok: false, reason: 'invalidLabels' };
+  if (input.autoRun) {
+    const imageSet = new Set(images);
+    const refusedSet = new Set(input.refusedImages);
+    const acceptedSet = new Set(input.acceptedImages);
+    const allLabels = [...input.refusedImages, ...input.acceptedImages];
+    const labelsAreKnown = allLabels.every((image) => imageSet.has(image));
+    if (!labelsAreKnown) return { ok: false, reason: 'invalidLabels' };
+    if (refusedSet.size !== input.refusedImages.length || acceptedSet.size !== input.acceptedImages.length) {
+      return { ok: false, reason: 'invalidLabels' };
+    }
+    if ([...refusedSet].some((image) => acceptedSet.has(image))) {
+      return { ok: false, reason: 'invalidLabels' };
+    }
+    if (allLabels.length !== images.length || allLabels.some((image) => !imageSet.has(image))) {
+      return { ok: false, reason: 'incompleteLabels' };
+    }
+  }
 
   return { ok: true };
 }
 
-export function createRoomData(input: CreateRoomInput, creatorSocketId: string, allImages: ImageCatalog): RoomData {
+export function createRoomData(input: CreateRoomInput, creatorSocketId: string, allImages: ImageCatalog, participantToken: string): RoomData {
   const images = allImages[input.imageSet] ?? [];
 
   return {
-    rule: input.rule,
+    rule: input.rule.trim(),
     roundDuration: input.roundDuration,
     creator: input.pseudo,
     autoRun: input.autoRun,
     hasAI: input.hasAI,
     paused: false,
-    refusedImages: input.refusedImages,
-    acceptedImages: input.acceptedImages,
+    refusedImages: input.autoRun ? input.refusedImages : [],
+    acceptedImages: input.autoRun ? input.acceptedImages : [],
     hasStarted: false,
     hasFinished: false,
     timer: input.roundDuration,
     images: [...images],
     currentImage: null,
+    currentRoundId: null,
+    nextRoundId: 1,
+    waitingForCreator: false,
+    roundHistory: [],
     sizeLimit: input.sizeLimit,
     users: {
-      [input.pseudo]: createUser(creatorSocketId),
+      [input.pseudo]: createUser(creatorSocketId, participantToken),
       ...(input.hasAI ? { [AI_PSEUDO]: createUser(AI_SOCKET_ID) } : {}),
     },
   };
+}
+
+export function toPublicUser(user: User): PublicUser {
+  return {
+    totalScore: user.totalScore,
+    lastScore: user.lastScore,
+    allScores: user.allScores,
+    connected: user.connected,
+  };
+}
+
+export function buildPublicRoomData(roomData: RoomData): PublicRoomData {
+  return {
+    roundDuration: roomData.roundDuration,
+    creator: roomData.creator,
+    autoRun: roomData.autoRun,
+    hasAI: roomData.hasAI,
+    paused: roomData.paused,
+    hasStarted: roomData.hasStarted,
+    hasFinished: roomData.hasFinished,
+    timer: roomData.timer,
+    currentImage: roomData.currentImage,
+    currentRoundId: roomData.currentRoundId,
+    waitingForCreator: roomData.waitingForCreator,
+    roundHistory: roomData.roundHistory,
+    revealedRule: roomData.hasFinished ? roomData.rule : null,
+    sizeLimit: roomData.sizeLimit,
+    users: Object.fromEntries(Object.entries(roomData.users).map(([pseudo, user]) => [pseudo, toPublicUser(user)])),
+  };
+}
+
+export function buildCreatorRoomData(roomData: RoomData): CreatorRoomData {
+  return {
+    ...buildPublicRoomData(roomData),
+    rule: roomData.rule,
+    refusedImages: roomData.refusedImages,
+    acceptedImages: roomData.acceptedImages,
+  };
+}
+
+export function buildClientRoomData(roomData: RoomData, pseudo: string): ClientRoomData {
+  return pseudo === roomData.creator ? buildCreatorRoomData(roomData) : buildPublicRoomData(roomData);
 }

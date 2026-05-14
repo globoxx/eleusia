@@ -5,7 +5,7 @@ import { Box, CircularProgress, Grid, Paper, Slider, Stack, Typography } from '@
 import Button from '@mui/material/Button';
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import type { RoomData } from '../shared/types';
+import type { ClientRoomData, CreatorRoomData, NewRoundPayload } from '../shared/types';
 import ImagesContainer from './ImagesContainer';
 import PointsModal from './Modals/PointsModal';
 import Timer from './Timer';
@@ -66,9 +66,13 @@ type GameBoardProps = {
   socket: Socket;
   pseudo: string;
   room: string;
-  roomData: RoomData;
+  roomData: ClientRoomData;
   callbackLeaveRoom: () => void;
 };
+
+function isCreatorRoomData(roomData: ClientRoomData): roomData is CreatorRoomData {
+  return 'rule' in roomData;
+}
 
 function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBoardProps) {
   const [timer, setTimer] = useState<number>(0);
@@ -76,10 +80,6 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
   const [waitOnCreator, setWaitOnCreator] = useState(false);
   const [currentImage, setCurrentImage] = useState('');
   const [votingDisabled, setVotingDisabled] = useState(true);
-  const [acceptedImages, setAcceptedImages] = useState<string[]>([]);
-  const [refusedImages, setRefusedImages] = useState<string[]>([]);
-  const [allImages, setAllImages] = useState<string[]>([]);
-  const [allLabels, setAllLabels] = useState<string[]>([]);
   const [vote, setVote] = useState<number>(0);
   const [modelReady, setModelReady] = useState(false);
   const [aiModel, setAiModel] = useState<AIModel | null>(null);
@@ -89,6 +89,10 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
 
   const isRoomCreator = pseudo === roomData.creator;
   const isAutoRun = roomData.autoRun;
+  const acceptedImages = roomData.roundHistory.filter((round) => round.label === 'Accepté').map((round) => round.image);
+  const refusedImages = roomData.roundHistory.filter((round) => round.label === 'Refusé').map((round) => round.image);
+  const allImages = roomData.roundHistory.map((round) => round.image);
+  const allLabels = roomData.roundHistory.map((round) => round.label);
 
   const handleClickStartGame = () => {
     socket.emit('startGame', room);
@@ -110,7 +114,9 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
   const handleClickRefuse = () => handleClickVote(-1);
 
   const handleClickVote = (newVote: number) => {
-    socket.emit('vote', room, newVote);
+    if (roomData.currentRoundId === null) return;
+
+    socket.emit('vote', { roomId: room, roundId: roomData.currentRoundId, vote: newVote });
     setVotingDisabled(true);
   };
 
@@ -156,28 +162,30 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
   }, [isRoomCreator, roomData.hasAI]);
 
   useEffect(() => {
-    const onNewRound = async (image: string) => {
+    const onNewRound = async ({ roundId, image }: NewRoundPayload) => {
       setCurrentImage(image);
-      setAllImages((current) => [...current, image]);
+      setVote(0);
       setVotingDisabled(false);
       setWaitOnCreator(false);
       setTimerKey((prevTimerKey) => prevTimerKey + 1);
 
-      if (isRoomCreator && roomData.autoRun) {
+      if (isRoomCreator && isCreatorRoomData(roomData) && roomData.autoRun) {
         const creatorVote = roomData.acceptedImages.includes(image) ? 1 : -1;
-        socket.emit('vote', room, creatorVote);
+        socket.emit('vote', { roomId: room, roundId, vote: creatorVote });
       }
 
-      if (isRoomCreator && roomData.hasAI && modelReady && aiModel && (acceptedImages.length > 0 || refusedImages.length > 0)) {
-        const trainingImages = acceptedImages.concat(refusedImages);
-        const trainingLabels = Array(acceptedImages.length).fill(1).concat(Array(refusedImages.length).fill(0));
+      const acceptedHistory = roomData.roundHistory.filter((round) => round.label === 'Accepté').map((round) => round.image);
+      const refusedHistory = roomData.roundHistory.filter((round) => round.label === 'Refusé').map((round) => round.image);
+      if (isRoomCreator && roomData.hasAI && modelReady && aiModel && (acceptedHistory.length > 0 || refusedHistory.length > 0)) {
+        const trainingImages = acceptedHistory.concat(refusedHistory);
+        const trainingLabels = Array(acceptedHistory.length).fill(1).concat(Array(refusedHistory.length).fill(0));
 
         try {
           await trainModel(aiModel, trainingImages, trainingLabels);
           const prediction = await predictImage(aiModel, image);
           const acceptedProbability = prediction[1] ?? 0.5;
           const aiVote = Number(((acceptedProbability - 0.5) * 2).toFixed(2));
-          socket.emit('aiVote', room, aiVote);
+          socket.emit('aiVote', { roomId: room, roundId, vote: aiVote });
         } catch (error: unknown) {
           console.error('Error training the model:', error);
         }
@@ -188,18 +196,7 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
     return () => {
       socket.off('newRound', onNewRound);
     };
-  }, [
-    acceptedImages,
-    aiModel,
-    isRoomCreator,
-    modelReady,
-    refusedImages,
-    room,
-    roomData.acceptedImages,
-    roomData.autoRun,
-    roomData.hasAI,
-    socket,
-  ]);
+  }, [aiModel, isRoomCreator, modelReady, room, roomData, socket]);
 
   useEffect(() => {
     const onTimer = (newTimer: number) => {
@@ -226,22 +223,11 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
   }, [socket]);
 
   useEffect(() => {
-    const onEndOfRound = (usersPoints: Record<string, number>, creatorVote: number) => {
-      const label = creatorVote > 0 ? 'Accepté' : 'Refusé';
-
-      if (currentImage) {
-        if (creatorVote > 0) {
-          setAcceptedImages((current) => [...current, currentImage]);
-        } else {
-          setRefusedImages((current) => [...current, currentImage]);
-        }
-      }
-
+    const onEndOfRound = ({ pointsByPseudo }: { pointsByPseudo: Record<string, number> }) => {
       setCurrentImage('');
-      setAllLabels((current) => [...current, label]);
 
       if (!isRoomCreator) {
-        setModalPoints(usersPoints[pseudo] ?? 0);
+        setModalPoints(pointsByPseudo[pseudo] ?? 0);
         setIsPointsModalOpen(true);
       }
     };
@@ -250,7 +236,7 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
     return () => {
       socket.off('endOfRound', onEndOfRound);
     };
-  }, [currentImage, isRoomCreator, pseudo, socket]);
+  }, [isRoomCreator, pseudo, socket]);
 
   return (
     <>
@@ -263,85 +249,85 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
         </Grid>
         <Grid size={8} sx={{ textAlign: 'center' }}>
           <Stack spacing={2} sx={{ width: '100%', alignItems: 'center' }}>
-          <Grid container spacing={2} sx={{ justifyContent: 'space-evenly', alignItems: 'center' }}>
-            <Grid size={6} sx={{ textAlign: 'center' }}>
-              <Typography variant="h6">Images refusées par le maître</Typography>
-              <Paper sx={{ height: 200 }} elevation={3}>
-                <ImagesContainer images={refusedImages} category="Refusé" />
-              </Paper>
-            </Grid>
-            <Grid size={6} sx={{ textAlign: 'center' }}>
-              <Typography variant="h6">Images acceptées par le maître</Typography>
-              <Paper sx={{ height: 200 }} elevation={3}>
-                <ImagesContainer images={acceptedImages} category="Accepté" />
-              </Paper>
-            </Grid>
-          </Grid>
-          <Grid container sx={{ alignItems: 'center', justifyContent: 'center' }}>
-            <Box sx={{ height: 200 }}>
-              {currentImage ? (
-                <Box
-                  component="img"
-                  src={currentImage}
-                  alt="Image courante"
-                  sx={{ display: 'block', height: 200, maxWidth: '100%', objectFit: 'contain' }}
-                />
-              ) : null}
-            </Box>
-          </Grid>
-          <Grid container sx={{ textAlign: 'center', alignItems: 'center' }}>
-            {isRoomCreator ? (
-              isAutoRun ? (
-                <Grid size={12} sx={{ textAlign: 'center' }}>
-                  <Typography variant="h5">
-                    {roomData.hasStarted
-                      ? 'Les labels sont déjà prêts !'
-                      : "Vous n'avez plus qu'à démarrer la partie quand vous êtes prêt !"}
-                  </Typography>
-                </Grid>
-              ) : (
-                roomData.hasStarted && (
-                  <>
-                    <Grid size={6} sx={{ textAlign: 'center' }}>
-                      <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>
-                        Refuser
-                      </Button>
-                    </Grid>
-                    <Grid size={6} sx={{ textAlign: 'center' }}>
-                      <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>
-                        Accepter
-                      </Button>
-                    </Grid>
-                  </>
-                )
-              )
-            ) : roomData.hasStarted ? (
-              <>
-                <Grid size={12} sx={{ textAlign: 'center' }}>
-                  <Slider
-                    sx={{ width: 0.8 }}
-                    defaultValue={0}
-                    aria-label="Default"
-                    valueLabelDisplay="auto"
-                    step={0.1}
-                    min={-1}
-                    max={1}
-                    marks={marks}
-                    onChange={handleDecisionChange}
-                  />
-                </Grid>
-                <Grid size={12} sx={{ textAlign: 'center' }}>
-                  <Button variant="contained" onClick={() => handleClickVote(vote)} disabled={votingDisabled || timer <= 0}>
-                    Confirmer
-                  </Button>
-                </Grid>
-              </>
-            ) : (
-              <Grid size={12} sx={{ textAlign: 'center' }}>
-                <Typography variant="h5">Le maître du jeu n'a pas encore démarré la partie !</Typography>
+            <Grid container spacing={2} sx={{ justifyContent: 'space-evenly', alignItems: 'center' }}>
+              <Grid size={6} sx={{ textAlign: 'center' }}>
+                <Typography variant="h6">Images refusées par le maître</Typography>
+                <Paper sx={{ height: 200 }} elevation={3}>
+                  <ImagesContainer images={refusedImages} category="Refusé" />
+                </Paper>
               </Grid>
-            )}
-          </Grid>
+              <Grid size={6} sx={{ textAlign: 'center' }}>
+                <Typography variant="h6">Images acceptées par le maître</Typography>
+                <Paper sx={{ height: 200 }} elevation={3}>
+                  <ImagesContainer images={acceptedImages} category="Accepté" />
+                </Paper>
+              </Grid>
+            </Grid>
+            <Grid container sx={{ alignItems: 'center', justifyContent: 'center' }}>
+              <Box sx={{ height: 200 }}>
+                {currentImage ? (
+                  <Box
+                    component="img"
+                    src={currentImage}
+                    alt="Image courante"
+                    sx={{ display: 'block', height: 200, maxWidth: '100%', objectFit: 'contain' }}
+                  />
+                ) : null}
+              </Box>
+            </Grid>
+            <Grid container sx={{ textAlign: 'center', alignItems: 'center' }}>
+              {isRoomCreator ? (
+                isAutoRun ? (
+                  <Grid size={12} sx={{ textAlign: 'center' }}>
+                    <Typography variant="h5">
+                      {roomData.hasStarted
+                        ? 'Les labels sont déjà prêts !'
+                        : "Vous n'avez plus qu'à démarrer la partie quand vous êtes prêt !"}
+                    </Typography>
+                  </Grid>
+                ) : (
+                  roomData.hasStarted && (
+                    <>
+                      <Grid size={6} sx={{ textAlign: 'center' }}>
+                        <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>
+                          Refuser
+                        </Button>
+                      </Grid>
+                      <Grid size={6} sx={{ textAlign: 'center' }}>
+                        <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>
+                          Accepter
+                        </Button>
+                      </Grid>
+                    </>
+                  )
+                )
+              ) : roomData.hasStarted ? (
+                <>
+                  <Grid size={12} sx={{ textAlign: 'center' }}>
+                    <Slider
+                      sx={{ width: 0.8 }}
+                      value={vote}
+                      aria-label="Default"
+                      valueLabelDisplay="auto"
+                      step={0.1}
+                      min={-1}
+                      max={1}
+                      marks={marks}
+                      onChange={handleDecisionChange}
+                    />
+                  </Grid>
+                  <Grid size={12} sx={{ textAlign: 'center' }}>
+                    <Button variant="contained" onClick={() => handleClickVote(vote)} disabled={votingDisabled || timer <= 0}>
+                      Confirmer
+                    </Button>
+                  </Grid>
+                </>
+              ) : (
+                <Grid size={12} sx={{ textAlign: 'center' }}>
+                  <Typography variant="h5">Le maître du jeu n'a pas encore démarré la partie !</Typography>
+                </Grid>
+              )}
+            </Grid>
           </Stack>
         </Grid>
         <Grid size={4} sx={{ alignSelf: 'flex-start' }}>
@@ -352,9 +338,7 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
               roundDuration={roomData.roundDuration}
               isPlaying={roomData.hasStarted && !roomData.hasFinished && !roomData.paused}
             />
-            {!isRoomCreator && (
-              <Typography variant="h6">{'Score: ' + (roomData.users[pseudo] ? roomData.users[pseudo].totalScore : 0)}</Typography>
-            )}
+            {!isRoomCreator && <Typography variant="h6">{'Score: ' + (roomData.users[pseudo] ? roomData.users[pseudo].totalScore : 0)}</Typography>}
             <Box sx={{ border: 1, m: 5, marginBottom: 2 }}>
               <UsersTable roomData={roomData} pseudo={pseudo} />
             </Box>
@@ -381,7 +365,7 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
         <Suspense fallback={<CircularProgress aria-label="Chargement des résultats" />}>
           <EndOfGameModal
             open={roomData.hasFinished}
-            rule={roomData.rule}
+            rule={roomData.revealedRule ?? ''}
             users={roomData.users}
             pseudo={pseudo}
             creatorPseudo={roomData.creator}

@@ -6,10 +6,10 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
-import type { User, RoomData } from '../shared/types';
+import type { ClientRoomData, PublicUser } from '../shared/types';
 import { TableFooter, Typography } from '@mui/material';
 
-function UsersTable({roomData, pseudo}: {roomData: RoomData, pseudo: string}) {
+function UsersTable({roomData, pseudo}: {roomData: ClientRoomData, pseudo: string}) {
     return (
         <TableContainer component={Paper}>
             <Table aria-label="simple table">
@@ -21,7 +21,7 @@ function UsersTable({roomData, pseudo}: {roomData: RoomData, pseudo: string}) {
                     </TableRow>
                 </TableHead>
                 <TableBody>
-                {Object.entries(roomData.users).sort(([, userA], [, userB]) => userB.totalScore - userA.totalScore).map(([linePseudo, user]: [string, User]) => (
+                {Object.entries(roomData.users).sort(([, userA], [, userB]) => userB.totalScore - userA.totalScore).map(([linePseudo, user]: [string, PublicUser]) => (
                     (linePseudo !== roomData.creator) && (
                         <TableRow
                             key={linePseudo}
@@ -37,7 +37,7 @@ function UsersTable({roomData, pseudo}: {roomData: RoomData, pseudo: string}) {
                 <TableFooter>
                     {!roomData.hasStarted && (
                         <TableCell align="center" colSpan={3}>
-                            <Typography variant="h6">{"Nombre de joueurs: " + (Object.keys(roomData.users).length - 1)}</Typography>
+                            <Typography variant="h6">{"Nombre de joueurs: " + Object.keys(roomData.users).filter((userPseudo) => userPseudo !== roomData.creator && userPseudo !== 'Eleus-IA').length}</Typography>
                         </TableCell>
                         )
                     }

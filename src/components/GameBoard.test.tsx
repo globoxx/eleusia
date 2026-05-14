@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react';
 import type { Socket } from 'socket.io-client';
 import { vi } from 'vitest';
-import type { RoomData } from '../shared/types';
+import type { ClientRoomData, CreatorRoomData } from '../shared/types';
 import GameBoard from './GameBoard';
 
 const aiModelMock = vi.hoisted(() => ({
@@ -48,7 +48,7 @@ function createSocketMock() {
   return { socket: socket as unknown as Socket, emit: socket.emit, handlers };
 }
 
-function createRoomData(overrides: Partial<RoomData> = {}): RoomData {
+function createRoomData(overrides: Partial<CreatorRoomData> = {}): CreatorRoomData {
   return {
     rule: 'Accept red cards',
     roundDuration: 10,
@@ -61,25 +61,34 @@ function createRoomData(overrides: Partial<RoomData> = {}): RoomData {
     hasStarted: true,
     hasFinished: false,
     timer: 10,
-    images: [],
     currentImage: null,
+    currentRoundId: 1,
+    waitingForCreator: false,
+    roundHistory: [],
+    revealedRule: null,
     sizeLimit: 20,
     users: {
       Teacher: {
-        socketId: 'creator-socket',
         totalScore: 0,
         lastScore: null,
         allScores: [],
-        vote: null,
+        connected: true,
       },
       Alice: {
-        socketId: 'alice-socket',
         totalScore: 0,
         lastScore: null,
         allScores: [],
-        vote: null,
+        connected: true,
       },
     },
+    ...overrides,
+  };
+}
+
+function createPublicRoomData(overrides: Partial<ClientRoomData> = {}): ClientRoomData {
+  const { rule: _rule, acceptedImages: _acceptedImages, refusedImages: _refusedImages, ...publicRoom } = createRoomData();
+  return {
+    ...publicRoom,
     ...overrides,
   };
 }
@@ -99,7 +108,7 @@ test('player vote emits room and vote only', () => {
   render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createRoomData()} callbackLeaveRoom={vi.fn()} />);
 
   act(() => {
-    handlers.newRound?.('images/cards/1.png');
+    handlers.newRound?.({ roundId: 1, image: 'images/cards/1.png' });
     handlers.timer?.(10);
   });
 
@@ -107,8 +116,8 @@ test('player vote emits room and vote only', () => {
 
   fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
 
-  expect(emit).toHaveBeenCalledWith('vote', 'room1', 0);
-  expect(emit).not.toHaveBeenCalledWith('vote', 'room1', 'Alice', 0);
+  expect(emit).toHaveBeenCalledWith('vote', { roomId: 'room1', roundId: 1, vote: 0 });
+  expect(emit).not.toHaveBeenCalledWith('vote', 'room1', 0);
 });
 
 test('creator controls pause and reveal actions', () => {
@@ -126,7 +135,7 @@ test('creator controls pause and reveal actions', () => {
 test('does not render end of game modal before game is finished', () => {
   const { socket } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createRoomData({ hasFinished: false })} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createPublicRoomData({ hasFinished: false })} callbackLeaveRoom={vi.fn()} />);
 
   expect(screen.queryByTestId('end-of-game-modal')).not.toBeInTheDocument();
 });
@@ -134,7 +143,7 @@ test('does not render end of game modal before game is finished', () => {
 test('renders end of game modal when game is finished', async () => {
   const { socket } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createRoomData({ hasFinished: true })} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createPublicRoomData({ hasFinished: true, revealedRule: 'Accept red cards' })} callbackLeaveRoom={vi.fn()} />);
 
   expect(await screen.findByTestId('end-of-game-modal')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Room room1' })).toBeInTheDocument();
@@ -171,4 +180,12 @@ test('AI initialization failure keeps the board rendered', async () => {
   expect(screen.getByRole('heading', { name: 'Room room1' })).toBeInTheDocument();
 
   consoleError.mockRestore();
+});
+
+test('player room data does not expose the secret rule before the end', () => {
+  const { socket } = createSocketMock();
+
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createPublicRoomData({ hasFinished: false, revealedRule: null })} callbackLeaveRoom={vi.fn()} />);
+
+  expect(screen.queryByText(/Accept red cards/)).not.toBeInTheDocument();
 });
