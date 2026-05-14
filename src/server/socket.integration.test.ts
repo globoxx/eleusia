@@ -49,6 +49,22 @@ test('creates and joins rooms with acknowledgements without leaking creator-only
   expect(playerData.users.Alice).not.toHaveProperty('vote');
 });
 
+test('does not publish open room codes on connection and joins by direct code', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const creator = await connectClient(url);
+  const player = await connectClient(url);
+
+  const updateRoomsPromise = onceWithTimeout<string[]>(player, 'updateRooms', 30);
+  await emitWithAck<RoomAck>(creator, 'createRoom', createPayload());
+  const joinAck = await emitWithAck<RoomAck>(player, 'joinRoom', { roomId: 'room1', pseudo: 'Alice' });
+  const missingAck = await emitWithAck<RoomAck>(player, 'joinRoom', { roomId: 'missing', pseudo: 'Bob' });
+
+  await expect(updateRoomsPromise).resolves.toBeNull();
+  expect(joinAck.ok).toBe(true);
+  expect(missingAck).toEqual({ ok: false, reason: 'roomNotFound' });
+});
+
 test('reconnects a disconnected player with a valid session token', async () => {
   const { server, url } = await startTestServer();
   createdServers.push(server);
@@ -109,6 +125,61 @@ test('rejects stale round votes server-side', async () => {
   await expect(rejectionPromise).resolves.toBe('staleRound');
 });
 
+test('allows the creator to start alone and exposes status transitions', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const creator = await connectClient(url);
+
+  await emitWithAck<RoomAck>(creator, 'createRoom', { ...createPayload(), autoRun: false, acceptedImages: [], refusedImages: [] });
+
+  const runningPromise = waitForRoomData(creator, (roomData) => roomData.status === 'running');
+  creator.emit('startGame', 'room1');
+  const runningRoom = await runningPromise;
+  expect(runningRoom.status).toBe('running');
+
+  const pausedPromise = waitForRoomData(creator, (roomData) => roomData.status === 'paused');
+  creator.emit('pause', 'room1');
+  const pausedRoom = await pausedPromise;
+  expect(pausedRoom.paused).toBe(true);
+});
+
+test('waits for the creator once and records complete round history including non-responses and AI', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const creator = await connectClient(url);
+  const player = await connectClient(url);
+
+  await emitWithAck<RoomAck>(creator, 'createRoom', { ...createPayload(), autoRun: false, hasAI: true, acceptedImages: [], refusedImages: [] });
+  await emitWithAck<RoomAck>(player, 'joinRoom', { roomId: 'room1', pseudo: 'Alice' });
+
+  const newRoundPromise = once<{ roundId: number; image: string }>(creator, 'newRound');
+  creator.emit('startGame', 'room1');
+  const round = await newRoundPromise;
+  server.data.room1.timer = 1;
+
+  const waitCreatorEvents: unknown[] = [];
+  creator.on('waitCreator', (payload) => waitCreatorEvents.push(payload));
+  await waitForRoomData(creator, (roomData) => roomData.status === 'waitingCreator');
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  expect(waitCreatorEvents).toHaveLength(1);
+
+  const endPromise = waitForRoomData(creator, (roomData) => roomData.roundHistory.length === 1);
+  creator.emit('vote', { roomId: 'room1', roundId: round.roundId, vote: 1 });
+  const roomData = await endPromise;
+  const history = roomData.roundHistory[0];
+
+  expect(history).toMatchObject({
+    roundId: round.roundId,
+    image: round.image,
+    label: 'Accepté',
+    creatorVote: 1,
+  });
+  expect(history.startedAt).toBeGreaterThan(0);
+  expect(history.endedAt).toBeGreaterThanOrEqual(history.startedAt);
+  expect(history.participantResults.Alice).toMatchObject({ vote: null, responded: false, points: 0, isAI: false });
+  expect(history.participantResults['Eleus-IA']).toMatchObject({ vote: null, responded: false, points: 0, isAI: true });
+});
+
 async function startTestServer(reconnectGraceMs = 120000) {
   const staticPath = createStaticFixture();
   const server = createGameServer({ staticPath, imagesFolder: path.join(staticPath, 'images'), nodeEnv: 'test', reconnectGraceMs });
@@ -151,6 +222,21 @@ async function connectClient(url: string) {
 function once<T>(socket: Socket, event: string) {
   return new Promise<T>((resolve) => {
     socket.once(event, resolve);
+  });
+}
+
+function onceWithTimeout<T>(socket: Socket, event: string, timeoutMs: number) {
+  return new Promise<T | null>((resolve) => {
+    const timer = setTimeout(() => {
+      socket.off(event, listener);
+      resolve(null);
+    }, timeoutMs);
+    const listener = (payload: T) => {
+      clearTimeout(timer);
+      socket.off(event, listener);
+      resolve(payload);
+    };
+    socket.on(event, listener);
   });
 }
 

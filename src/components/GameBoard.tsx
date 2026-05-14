@@ -91,8 +91,6 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
   const isAutoRun = roomData.autoRun;
   const acceptedImages = roomData.roundHistory.filter((round) => round.label === 'Accepté').map((round) => round.image);
   const refusedImages = roomData.roundHistory.filter((round) => round.label === 'Refusé').map((round) => round.image);
-  const allImages = roomData.roundHistory.map((round) => round.image);
-  const allLabels = roomData.roundHistory.map((round) => round.label);
 
   const handleClickStartGame = () => {
     socket.emit('startGame', room);
@@ -366,11 +364,9 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
           <EndOfGameModal
             open={roomData.hasFinished}
             rule={roomData.revealedRule ?? ''}
-            users={roomData.users}
             pseudo={pseudo}
             creatorPseudo={roomData.creator}
-            images={allImages}
-            labels={allLabels}
+            roundHistory={roomData.roundHistory}
           />
         </Suspense>
       ) : null}

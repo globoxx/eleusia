@@ -5,10 +5,10 @@ import {
   buildPublicRoomData,
   calculatePoints,
   createRoomData,
-  getOpenRoomIds,
   isValidPseudo,
   isValidRoomId,
   normalizeVote,
+  setRoomStatus,
   validateCreateRoomInput,
 } from './gameState';
 
@@ -84,16 +84,6 @@ test('creates a room with creator and special AI participant', () => {
   expect(room.images).toEqual(catalog.cards);
 });
 
-test('only lists rooms that are open and unfinished', () => {
-  const openRoom = createRoomData(validInput, 'socket-1', catalog, 'token-1');
-  const startedRoom = createRoomData({ ...validInput, roomId: 'started' }, 'socket-2', catalog, 'token-2');
-  startedRoom.hasStarted = true;
-  const finishedRoom = createRoomData({ ...validInput, roomId: 'finished' }, 'socket-3', catalog, 'token-3');
-  finishedRoom.hasFinished = true;
-
-  expect(getOpenRoomIds({ open: openRoom, started: startedRoom, finished: finishedRoom })).toEqual(['open']);
-});
-
 test('builds public and creator room payloads without leaking private state', () => {
   const room = createRoomData(validInput, 'socket-1', catalog, 'token-1');
   room.users.Teacher.vote = 1;
@@ -110,6 +100,29 @@ test('builds public and creator room payloads without leaking private state', ()
   expect(creatorRoom.rule).toBe(validInput.rule);
   expect(creatorRoom.acceptedImages).toEqual(validInput.acceptedImages);
   expect(creatorRoom.refusedImages).toEqual(validInput.refusedImages);
+});
+
+test('derives legacy payload flags from room status', () => {
+  const room = createRoomData(validInput, 'socket-1', catalog, 'token-1');
+  expect(room.status).toBe('lobby');
+
+  setRoomStatus(room, 'running');
+  expect(buildPublicRoomData(room)).toMatchObject({
+    status: 'running',
+    hasStarted: true,
+    hasFinished: false,
+    paused: false,
+    waitingForCreator: false,
+  });
+
+  setRoomStatus(room, 'paused');
+  expect(buildPublicRoomData(room)).toMatchObject({ status: 'paused', paused: true });
+
+  setRoomStatus(room, 'waitingCreator');
+  expect(buildPublicRoomData(room)).toMatchObject({ status: 'waitingCreator', waitingForCreator: true });
+
+  setRoomStatus(room, 'finished');
+  expect(buildPublicRoomData(room)).toMatchObject({ status: 'finished', hasFinished: true, revealedRule: validInput.rule });
 });
 
 test('normalizes votes and preserves the bounded current scoring rule', () => {

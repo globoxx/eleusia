@@ -36,7 +36,6 @@ type HomeProps = {
 };
 
 function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoom }: HomeProps) {
-  const [rooms, setRooms] = useState<string[]>([]);
   const [pseudo, setPseudo] = useState('');
   const [room, setRoom] = useState('');
 
@@ -56,6 +55,9 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
   const selectedImages = newRoomImageSet && allImages[newRoomImageSet] ? allImages[newRoomImageSet] : [];
+  const labeledImagesCount = left.length + right.length;
+  const missingLabelsCount = Math.max(0, selectedImages.length - labeledImagesCount);
+  const labelsAreComplete = !labelsSwitchChecked || (selectedImages.length > 0 && labeledImagesCount === selectedImages.length);
 
   const handlePseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     callbackPseudoChange(e);
@@ -73,7 +75,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
   }, []);
 
   const handleClickJoinRoom = () => {
-    if (pseudo && room && rooms.includes(room)) {
+    if (pseudo && room) {
       const payload: JoinRoomPayload = { roomId: room, pseudo };
       socket.emit('joinRoom', payload, (ack: RoomAck) => {
         if (ack.ok) {
@@ -86,11 +88,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
       return;
     }
 
-    if (pseudo && room) {
-      alert("Cette room n'existe pas ou a déjà commencé.");
-    } else {
-      alert('Choisissez un pseudo et un numéro de room à rejoindre.');
-    }
+    alert('Choisissez un pseudo et un numéro de room à rejoindre.');
   };
 
   const handleClickCreateRoom = () => {
@@ -138,14 +136,12 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
   };
 
   useEffect(() => {
-    const onUpdateRooms = (updatedRooms: string[]) => setRooms(updatedRooms);
     const onUpdateImages = (updatedImages: ImageCatalog) => setAllImages(updatedImages);
     const onRoomAlreadyExists = () => alert('Ce numéro de room existe déjà.');
     const onPseudoAlreadyExists = () => alert('Ce pseudo existe déjà dans cette room.');
     const onRoomFull = () => alert('Cette room est déjà pleine.');
     const onActionRejected = () => alert('Action refusée par le serveur.');
 
-    socket.on('updateRooms', onUpdateRooms);
     socket.on('updateImages', onUpdateImages);
     socket.on('roomAlreadyExists', onRoomAlreadyExists);
     socket.on('pseudoAlreadyExists', onPseudoAlreadyExists);
@@ -153,7 +149,6 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
     socket.on('actionRejected', onActionRejected);
 
     return () => {
-      socket.off('updateRooms', onUpdateRooms);
       socket.off('updateImages', onUpdateImages);
       socket.off('roomAlreadyExists', onRoomAlreadyExists);
       socket.off('pseudoAlreadyExists', onPseudoAlreadyExists);
@@ -264,6 +259,11 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                   <HelpTooltip title="Cocher cette option permet de définir les labels à l'avance. Cela vous permet de ne pas avoir à catégoriser les images en cours de partie." />
                 </Stack>
                 <TransferImage key={newRoomImageSet} visible={labelsSwitchChecked} imagesList={selectedImages} callback={callbackLabels} />
+                {labelsSwitchChecked ? (
+                  <Typography variant="body2" color={missingLabelsCount === 0 ? 'success.main' : 'warning.main'}>
+                    {missingLabelsCount === 0 ? 'Toutes les images sont classées.' : `${missingLabelsCount} image(s) restent à classer.`}
+                  </Typography>
+                ) : null}
                 <Stack direction="row" sx={{ alignItems: 'center' }}>
                   <FormControlLabel
                     control={<Switch checked={AISwitchChecked} onChange={(event) => setAISwitchChecked(event.target.checked)} slotProps={{ input: { 'aria-label': 'controlled' } }} />}
@@ -297,7 +297,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                     newRoomImageSet.length === 0 ||
                     newRoomRoundDuration.length === 0 ||
                     newRoomRule.length === 0 ||
-                    (labelsSwitchChecked && (left.length === 0 || right.length === 0))
+                    !labelsAreComplete
                   }
                   onClick={handleClickCreateRoom}
                 >

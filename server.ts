@@ -10,6 +10,7 @@ import type {
   Data,
   ImageCatalog,
   JoinRoomPayload,
+  ParticipantRoundResult,
   ReconnectRoomPayload,
   RoomAck,
   VotePayload,
@@ -24,11 +25,11 @@ import {
   countPlayers,
   createRoomData,
   createUser,
-  getOpenRoomIds,
   hasHumanUsers,
   isValidPseudo,
   isValidRoomId,
   normalizeVote,
+  setRoomStatus,
   validateCreateRoomInput,
 } from './src/server/gameState';
 
@@ -91,7 +92,6 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
   const allImages = readImageCatalog(imagesFolder);
 
   io.on('connection', (socket: Socket) => {
-    socket.emit('updateRooms', getOpenRoomIds(data));
     socket.emit('updateImages', allImages);
 
     socket.on('createRoom', (payload: unknown, ack?: RoomAckCallback) => {
@@ -125,7 +125,6 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       log('room_created', { roomId: payload.roomId, pseudo: payload.pseudo });
       ack?.({ ok: true, roomId: payload.roomId, pseudo: payload.pseudo, participantToken });
       emitRoomData(payload.roomId);
-      emitRooms();
     });
 
     socket.on('joinRoom', (payload: unknown, ack?: RoomAckCallback) => {
@@ -135,7 +134,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       }
 
       const roomData = data[payload.roomId];
-      if (!roomData || roomData.hasStarted || roomData.hasFinished) {
+      if (!roomData || roomData.status !== 'lobby') {
         reject(socket, 'roomNotFound', ack);
         return;
       }
@@ -174,7 +173,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
 
       const roomData = data[payload.roomId];
       const user = roomData?.users[payload.pseudo];
-      if (!roomData || !user || user.participantToken !== payload.participantToken || roomData.hasFinished) {
+      if (!roomData || !user || user.participantToken !== payload.participantToken || isTerminalStatus(roomData.status)) {
         reject(socket, 'invalidReconnect', ack);
         return;
       }
@@ -205,11 +204,10 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       }
 
       const roomData = data[roomId];
-      if (!roomData || roomData.hasStarted || roomData.hasFinished) return;
+      if (!roomData || roomData.status !== 'lobby') return;
 
-      roomData.hasStarted = true;
+      setRoomStatus(roomData, 'running');
       log('game_started', { roomId });
-      emitRooms();
       startNewRound(roomId);
     });
 
@@ -224,7 +222,9 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       const user = roomData.users[session.pseudo];
       user.vote = votePayload.vote;
       user.voteRoundId = votePayload.roundId;
-      roomData.waitingForCreator = false;
+      if (roomData.status === 'waitingCreator') {
+        setRoomStatus(roomData, 'running');
+      }
       emitRoomData(votePayload.roomId);
     });
 
@@ -272,9 +272,9 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       }
 
       const roomData = data[roomId];
-      if (!roomData || roomData.hasFinished) return;
+      if (!roomData || isTerminalStatus(roomData.status)) return;
 
-      roomData.paused = !roomData.paused;
+      setRoomStatus(roomData, roomData.status === 'paused' ? 'running' : 'paused');
       emitRoomData(roomId);
     });
 
@@ -282,10 +282,6 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       removeSocketFromRoom(socket, false);
     });
   });
-
-  function emitRooms() {
-    io.emit('updateRooms', getOpenRoomIds(data));
-  }
 
   function emitRoomData(roomId: string) {
     const roomData = data[roomId];
@@ -324,7 +320,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       return null;
     }
 
-    if (!roomData.hasStarted || roomData.hasFinished || roomData.paused || !roomData.currentRoundId || roomData.timer <= 0) {
+    if (isTerminalStatus(roomData.status) || roomData.status === 'paused' || !roomData.currentRoundId) {
       reject(socket, 'voteClosed');
       return null;
     }
@@ -335,6 +331,11 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     }
 
     if (isAiVote) {
+      if (roomData.status !== 'running' || roomData.timer <= 0) {
+        reject(socket, 'voteClosed');
+        return null;
+      }
+
       if (!isCreatorSocket(socket, payload.roomId) || !roomData.hasAI) {
         reject(socket, 'invalidAiVote');
         return null;
@@ -353,6 +354,16 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     const user = session?.roomId === payload.roomId ? roomData.users[session.pseudo] : null;
     if (!session || !user || user.socketId !== socket.id || !user.connected) {
       reject(socket, 'invalidVote');
+      return null;
+    }
+
+    if (roomData.status === 'waitingCreator') {
+      if (session.pseudo !== roomData.creator) {
+        reject(socket, 'voteClosed');
+        return null;
+      }
+    } else if (roomData.status !== 'running' || roomData.timer <= 0) {
+      reject(socket, 'voteClosed');
       return null;
     }
 
@@ -387,7 +398,6 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
         scheduleRoomCleanup(session.roomId);
       } else {
         emitRoomData(session.roomId);
-        emitRooms();
       }
 
       log('room_left', { roomId: session.roomId, pseudo: session.pseudo });
@@ -400,7 +410,6 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
 
     log('room_disconnected', { roomId: session.roomId, pseudo: session.pseudo });
     emitRoomData(session.roomId);
-    emitRooms();
   }
 
   function scheduleReconnectExpiration(roomId: string, pseudo: string) {
@@ -416,12 +425,11 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       log('room_reconnect_expired', { roomId, pseudo });
 
       if (pseudo === roomData.creator) {
-        finishRoom(roomId);
+        finishRoom(roomId, 'expired');
       } else if (!hasHumanUsers(roomData)) {
         scheduleRoomCleanup(roomId);
       } else {
         emitRoomData(roomId);
-        emitRooms();
       }
     }, reconnectGraceMs);
 
@@ -442,17 +450,14 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     return `${roomId}:${pseudo}`;
   }
 
-  function finishRoom(roomId: string) {
+  function finishRoom(roomId: string, status: 'finished' | 'expired' = 'finished') {
     const roomData = data[roomId];
     if (!roomData) return;
 
-    roomData.hasFinished = true;
-    roomData.paused = false;
-    roomData.waitingForCreator = false;
+    setRoomStatus(roomData, status);
     log('game_finished', { roomId });
     emitRoomData(roomId);
     scheduleRoomCleanup(roomId);
-    emitRooms();
   }
 
   function scheduleRoomCleanup(roomId: string) {
@@ -462,7 +467,6 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       delete data[roomId];
       cleanupTimers.delete(roomId);
       log('room_cleaned', { roomId });
-      emitRooms();
     }, roomCleanupDelayMs);
 
     timer.unref?.();
@@ -493,9 +497,10 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     const roundId = roomData.nextRoundId;
     roomData.nextRoundId += 1;
     roomData.currentRoundId = roundId;
+    roomData.currentRoundStartedAt = Date.now();
     roomData.currentImage = randomImage;
     roomData.images = roomData.images.filter((img) => img !== randomImage);
-    roomData.waitingForCreator = false;
+    setRoomStatus(roomData, 'running');
 
     for (const user of Object.values(roomData.users)) {
       user.vote = null;
@@ -510,7 +515,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
   const roundInterval = setInterval(function () {
     for (const roomId of Object.keys(data)) {
       const roomData = data[roomId];
-      if (!roomData.hasStarted || roomData.hasFinished || roomData.paused || !roomData.currentRoundId) continue;
+      if (roomData.status !== 'running' || !roomData.currentRoundId) continue;
 
       roomData.timer -= 1;
       if (Object.values(roomData.users).every((user) => !user.connected || user.voteRoundId === roomData.currentRoundId)) {
@@ -522,30 +527,41 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
 
         if (creatorVote !== null && creatorVote !== undefined) {
           const usersPoints: Record<string, number> = {};
+          const participantResults: Record<string, ParticipantRoundResult> = {};
 
           for (const [userPseudo, user] of Object.entries(roomData.users)) {
             if (userPseudo === roomData.creator) continue;
 
-            const userVote = user.voteRoundId === roomData.currentRoundId ? user.vote ?? 0 : 0;
-            const points = calculatePoints(creatorVote, userVote);
+            const responded = user.voteRoundId === roomData.currentRoundId && user.vote !== null;
+            const effectiveVote = responded ? user.vote ?? 0 : 0;
+            const points = calculatePoints(creatorVote, effectiveVote);
             user.lastScore = points;
             user.allScores.push(points);
             user.totalScore += points;
             usersPoints[userPseudo] = points;
+            participantResults[userPseudo] = {
+              vote: responded ? user.vote : null,
+              points,
+              responded,
+              isAI: userPseudo === AI_PSEUDO,
+            };
           }
 
           const label = creatorVote > 0 ? 'Accepté' : 'Refusé';
           roomData.roundHistory.push({
             roundId: roomData.currentRoundId,
             image: roomData.currentImage ?? '',
+            startedAt: roomData.currentRoundStartedAt ?? Date.now(),
+            endedAt: Date.now(),
             label,
-            pointsByPseudo: usersPoints,
+            creatorVote,
+            participantResults,
           });
 
           io.in(roomId).emit('endOfRound', { roundId: roomData.currentRoundId, pointsByPseudo: usersPoints, creatorVote });
           startNewRound(roomId);
-        } else if (!roomData.waitingForCreator) {
-          roomData.waitingForCreator = true;
+        } else {
+          setRoomStatus(roomData, 'waitingCreator');
           io.in(roomId).emit('waitCreator');
           emitRoomData(roomId);
         }
@@ -656,6 +672,10 @@ function isVotePayload(payload: unknown): payload is VotePayload {
   const input = payload as Record<string, unknown>;
 
   return isValidRoomId(input.roomId) && typeof input.roundId === 'number' && Number.isInteger(input.roundId) && typeof input.vote === 'number';
+}
+
+function isTerminalStatus(status: string) {
+  return status === 'finished' || status === 'expired';
 }
 
 function log(event: string, details: Record<string, unknown>) {

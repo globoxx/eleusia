@@ -14,13 +14,24 @@ export interface Users {
   [pseudo: string]: User;
 }
 
+export type RoomStatus = 'lobby' | 'running' | 'paused' | 'waitingCreator' | 'finished' | 'expired';
 export type RoundLabel = 'Accepté' | 'Refusé';
+
+export interface ParticipantRoundResult {
+  vote: number | null;
+  points: number;
+  responded: boolean;
+  isAI: boolean;
+}
 
 export interface RoundHistoryItem {
   roundId: number;
   image: string;
+  startedAt: number;
+  endedAt: number;
   label: RoundLabel;
-  pointsByPseudo: Record<string, number>;
+  creatorVote: number;
+  participantResults: Record<string, ParticipantRoundResult>;
 }
 
 export interface RoomData {
@@ -29,6 +40,7 @@ export interface RoomData {
   creator: string;
   autoRun: boolean;
   hasAI: boolean;
+  status: RoomStatus;
   paused: boolean;
   refusedImages: string[];
   acceptedImages: string[];
@@ -38,6 +50,7 @@ export interface RoomData {
   images: string[];
   currentImage: string | null;
   currentRoundId: number | null;
+  currentRoundStartedAt: number | null;
   nextRoundId: number;
   waitingForCreator: boolean;
   roundHistory: RoundHistoryItem[];
@@ -65,6 +78,7 @@ export interface PublicUsers {
 }
 
 export interface PublicRoomData {
+  status: RoomStatus;
   roundDuration: number;
   creator: string;
   autoRun: boolean;

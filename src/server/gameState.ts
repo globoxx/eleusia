@@ -1,4 +1,4 @@
-import type { ClientRoomData, CreatorRoomData, ImageCatalog, PublicRoomData, PublicUser, RoomData, User } from '../shared/types';
+import type { ClientRoomData, CreatorRoomData, ImageCatalog, PublicRoomData, PublicUser, RoomData, RoomStatus, User } from '../shared/types';
 
 export const AI_PSEUDO = 'Eleus-IA';
 export const AI_SOCKET_ID = 'ai';
@@ -93,12 +93,6 @@ export function hasHumanUsers(roomData: RoomData): boolean {
   return Object.values(roomData.users).some((user) => user.socketId !== AI_SOCKET_ID);
 }
 
-export function getOpenRoomIds(data: Record<string, RoomData>): string[] {
-  return Object.entries(data)
-    .filter(([, roomData]) => !roomData.hasStarted && !roomData.hasFinished)
-    .map(([roomId]) => roomId);
-}
-
 export function validateCreateRoomInput(input: CreateRoomInput, allImages: ImageCatalog): ValidationResult {
   if (!isValidPseudo(input.pseudo)) return { ok: false, reason: 'invalidPseudo' };
   if (!isValidRoomId(input.roomId)) return { ok: false, reason: 'invalidRoom' };
@@ -143,6 +137,7 @@ export function createRoomData(input: CreateRoomInput, creatorSocketId: string, 
     creator: input.pseudo,
     autoRun: input.autoRun,
     hasAI: input.hasAI,
+    status: 'lobby',
     paused: false,
     refusedImages: input.autoRun ? input.refusedImages : [],
     acceptedImages: input.autoRun ? input.acceptedImages : [],
@@ -152,6 +147,7 @@ export function createRoomData(input: CreateRoomInput, creatorSocketId: string, 
     images: [...images],
     currentImage: null,
     currentRoundId: null,
+    currentRoundStartedAt: null,
     nextRoundId: 1,
     waitingForCreator: false,
     roundHistory: [],
@@ -161,6 +157,14 @@ export function createRoomData(input: CreateRoomInput, creatorSocketId: string, 
       ...(input.hasAI ? { [AI_PSEUDO]: createUser(AI_SOCKET_ID) } : {}),
     },
   };
+}
+
+export function setRoomStatus(roomData: RoomData, status: RoomStatus) {
+  roomData.status = status;
+  roomData.hasStarted = status !== 'lobby';
+  roomData.hasFinished = status === 'finished' || status === 'expired';
+  roomData.paused = status === 'paused';
+  roomData.waitingForCreator = status === 'waitingCreator';
 }
 
 export function toPublicUser(user: User): PublicUser {
@@ -174,19 +178,20 @@ export function toPublicUser(user: User): PublicUser {
 
 export function buildPublicRoomData(roomData: RoomData): PublicRoomData {
   return {
+    status: roomData.status,
     roundDuration: roomData.roundDuration,
     creator: roomData.creator,
     autoRun: roomData.autoRun,
     hasAI: roomData.hasAI,
-    paused: roomData.paused,
-    hasStarted: roomData.hasStarted,
-    hasFinished: roomData.hasFinished,
+    paused: roomData.status === 'paused',
+    hasStarted: roomData.status !== 'lobby',
+    hasFinished: roomData.status === 'finished' || roomData.status === 'expired',
     timer: roomData.timer,
     currentImage: roomData.currentImage,
     currentRoundId: roomData.currentRoundId,
-    waitingForCreator: roomData.waitingForCreator,
+    waitingForCreator: roomData.status === 'waitingCreator',
     roundHistory: roomData.roundHistory,
-    revealedRule: roomData.hasFinished ? roomData.rule : null,
+    revealedRule: roomData.status === 'finished' || roomData.status === 'expired' ? roomData.rule : null,
     sizeLimit: roomData.sizeLimit,
     users: Object.fromEntries(Object.entries(roomData.users).map(([pseudo, user]) => [pseudo, toPublicUser(user)])),
   };

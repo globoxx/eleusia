@@ -55,6 +55,7 @@ function createRoomData(overrides: Partial<CreatorRoomData> = {}): CreatorRoomDa
     creator: 'Teacher',
     autoRun: false,
     hasAI: false,
+    status: 'running',
     paused: false,
     refusedImages: [],
     acceptedImages: [],
