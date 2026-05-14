@@ -6,7 +6,6 @@ import Button from '@mui/material/Button';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import type { RoomData } from '../shared/types';
-import MyModel from './AIModel';
 import ImagesContainer from './ImagesContainer';
 import EndOfGameModal from './Modals/EndOfGameModal';
 import PointsModal from './Modals/PointsModal';
@@ -23,25 +22,32 @@ const marks = [
   { value: 1, label: 'Accepter' },
 ];
 
-async function initializeModel() {
-  await MyModel.loadFeatureExtractor();
-  MyModel.loadModel();
+type AIModel = typeof import('./AIModel').default;
+
+async function loadAIModel() {
+  const { default: model } = await import('./AIModel');
+  return model;
 }
 
-async function trainModel(images: string[], labels: number[]) {
+async function initializeModel(model: AIModel) {
+  await model.loadFeatureExtractor();
+  model.loadModel();
+}
+
+async function trainModel(model: AIModel, images: string[], labels: number[]) {
   const imgs = await Promise.all(images.map(async (image) => createImageElement(image)));
-  if (MyModel.model && MyModel.featureExtractor) {
-    await MyModel.trainModel(imgs, labels);
+  if (model.model && model.featureExtractor) {
+    await model.trainModel(imgs, labels);
     return;
   }
 
   throw new Error('Model or feature extractor not loaded');
 }
 
-async function predictImage(image: string) {
+async function predictImage(model: AIModel, image: string) {
   const img = await createImageElement(image);
-  if (MyModel.model && MyModel.featureExtractor) {
-    return MyModel.predictImage(img);
+  if (model.model && model.featureExtractor) {
+    return model.predictImage(img);
   }
 
   throw new Error('Model or feature extractor not loaded');
@@ -76,6 +82,7 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
   const [allLabels, setAllLabels] = useState<string[]>([]);
   const [vote, setVote] = useState<number>(0);
   const [modelReady, setModelReady] = useState(false);
+  const [aiModel, setAiModel] = useState<AIModel | null>(null);
 
   const [isPointsModalOpen, setIsPointsModalOpen] = useState(false);
   const [modalPoints, setModalPoints] = useState(0);
@@ -118,14 +125,34 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
   }, []);
 
   useEffect(() => {
-    if (!isRoomCreator || !roomData.hasAI) return;
+    if (!isRoomCreator || !roomData.hasAI) {
+      setAiModel(null);
+      setModelReady(false);
+      return undefined;
+    }
 
-    initializeModel()
-      .then(() => setModelReady(true))
+    let cancelled = false;
+    setModelReady(false);
+
+    loadAIModel()
+      .then(async (model) => {
+        await initializeModel(model);
+        if (!cancelled) {
+          setAiModel(model);
+          setModelReady(true);
+        }
+      })
       .catch((error: unknown) => {
-        setModelReady(false);
-        console.error('Error initializing model:', error);
+        if (!cancelled) {
+          setAiModel(null);
+          setModelReady(false);
+          console.error('Error initializing model:', error);
+        }
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isRoomCreator, roomData.hasAI]);
 
   useEffect(() => {
@@ -141,13 +168,13 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
         socket.emit('vote', room, creatorVote);
       }
 
-      if (isRoomCreator && roomData.hasAI && modelReady && (acceptedImages.length > 0 || refusedImages.length > 0)) {
+      if (isRoomCreator && roomData.hasAI && modelReady && aiModel && (acceptedImages.length > 0 || refusedImages.length > 0)) {
         const trainingImages = acceptedImages.concat(refusedImages);
         const trainingLabels = Array(acceptedImages.length).fill(1).concat(Array(refusedImages.length).fill(0));
 
         try {
-          await trainModel(trainingImages, trainingLabels);
-          const prediction = await predictImage(image);
+          await trainModel(aiModel, trainingImages, trainingLabels);
+          const prediction = await predictImage(aiModel, image);
           const acceptedProbability = prediction[1] ?? 0.5;
           const aiVote = Number(((acceptedProbability - 0.5) * 2).toFixed(2));
           socket.emit('aiVote', room, aiVote);
@@ -163,6 +190,7 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
     };
   }, [
     acceptedImages,
+    aiModel,
     isRoomCreator,
     modelReady,
     refusedImages,

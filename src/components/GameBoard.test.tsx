@@ -1,12 +1,25 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import type { Socket } from 'socket.io-client';
 import { vi } from 'vitest';
 import type { RoomData } from '../shared/types';
 import GameBoard from './GameBoard';
 
+const aiModelMock = vi.hoisted(() => ({
+  loadFeatureExtractor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  loadModel: vi.fn<() => void>(),
+  trainModel: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  predictImage: vi.fn<() => Promise<number[]>>().mockResolvedValue([0.2, 0.8]),
+  featureExtractor: {},
+  model: {},
+}));
+
 vi.mock('./Timer', () => ({
   default: () => <div data-testid="timer" />,
+}));
+
+vi.mock('./AIModel', () => ({
+  default: aiModelMock,
 }));
 
 type Handler = (...args: unknown[]) => void;
@@ -67,6 +80,15 @@ function createRoomData(overrides: Partial<RoomData> = {}): RoomData {
   };
 }
 
+beforeEach(() => {
+  aiModelMock.loadFeatureExtractor.mockResolvedValue(undefined);
+  aiModelMock.loadModel.mockClear();
+  aiModelMock.trainModel.mockResolvedValue(undefined);
+  aiModelMock.predictImage.mockResolvedValue([0.2, 0.8]);
+  aiModelMock.featureExtractor = {};
+  aiModelMock.model = {};
+});
+
 test('player vote emits room and vote only', () => {
   const { socket, emit, handlers } = createSocketMock();
 
@@ -95,4 +117,37 @@ test('creator controls pause and reveal actions', () => {
 
   expect(emit).toHaveBeenCalledWith('pause', 'room1');
   expect(emit).toHaveBeenCalledWith('endGame', 'room1');
+});
+
+test('does not initialize AI model when room has no AI', () => {
+  const { socket } = createSocketMock();
+
+  render(<GameBoard socket={socket} pseudo="Teacher" room="room1" roomData={createRoomData({ hasAI: false })} callbackLeaveRoom={vi.fn()} />);
+
+  expect(aiModelMock.loadFeatureExtractor).not.toHaveBeenCalled();
+  expect(aiModelMock.loadModel).not.toHaveBeenCalled();
+});
+
+test('creator initializes AI model when room has AI', async () => {
+  const { socket } = createSocketMock();
+
+  render(<GameBoard socket={socket} pseudo="Teacher" room="room1" roomData={createRoomData({ hasAI: true })} callbackLeaveRoom={vi.fn()} />);
+
+  await waitFor(() => expect(aiModelMock.loadFeatureExtractor).toHaveBeenCalledTimes(1));
+
+  expect(aiModelMock.loadModel).toHaveBeenCalledTimes(1);
+});
+
+test('AI initialization failure keeps the board rendered', async () => {
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  aiModelMock.loadFeatureExtractor.mockRejectedValueOnce(new Error('model unavailable'));
+  const { socket } = createSocketMock();
+
+  render(<GameBoard socket={socket} pseudo="Teacher" room="room1" roomData={createRoomData({ hasAI: true })} callbackLeaveRoom={vi.fn()} />);
+
+  await waitFor(() => expect(consoleError).toHaveBeenCalledWith('Error initializing model:', expect.any(Error)));
+
+  expect(screen.getByRole('heading', { name: 'Room room1' })).toBeInTheDocument();
+
+  consoleError.mockRestore();
 });
