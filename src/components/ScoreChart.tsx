@@ -120,7 +120,7 @@ export default function ScoreChart({ scores, pseudo, isCreator, allImages, allLa
 
   return (
     <>
-      <FormControlLabel control={<Switch checked={cumulative} onChange={handleChange} inputProps={{ 'aria-label': 'controlled' }} />} label="Afficher score total" />
+      <FormControlLabel control={<Switch checked={cumulative} onChange={handleChange} slotProps={{ input: { 'aria-label': 'controlled' } }} />} label="Afficher score total" />
       <Line data={data} options={options} />
     </>
   );

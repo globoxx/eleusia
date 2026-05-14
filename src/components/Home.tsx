@@ -158,8 +158,8 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
 
   return (
     <>
-      <Grid container justifyContent="center" spacing={5}>
-        <Grid item textAlign="center" xs={12}>
+      <Grid container spacing={5} sx={{ justifyContent: 'center' }}>
+        <Grid size={12} sx={{ textAlign: 'center' }}>
           <Button
             variant="contained"
             color="success"
@@ -172,13 +172,13 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
           <Typography variant="h3">ELEUS-IA</Typography>
           <Typography variant="h5">Dans la peau d'une intelligence artificielle</Typography>
         </Grid>
-        <Grid item textAlign="center" xs={12}>
-          <TextField required label="Pseudo" inputProps={{ maxLength: 15 }} value={pseudo} onChange={handlePseudoChange} variant="outlined" />
+        <Grid size={12} sx={{ textAlign: 'center' }}>
+          <TextField required label="Pseudo" slotProps={{ htmlInput: { maxLength: 15 } }} value={pseudo} onChange={handlePseudoChange} variant="outlined" />
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{ backgroundColor: 'lightblue' }}>
-              <Stack direction="row" alignItems="center">
+              <Stack direction="row" sx={{ alignItems: 'center' }}>
                 <Typography variant="h6">Rejoindre une room</Typography>
                 <HelpTooltip title="Si vous ne connaissez pas le numéro de la room, demandez à son créateur de vous le communiquer." />
               </Stack>
@@ -193,10 +193,10 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
             </AccordionDetails>
           </Accordion>
         </Grid>
-        <Grid item xs={6}>
+        <Grid size={6}>
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{ backgroundColor: 'lightblue' }}>
-              <Stack direction="row" alignItems="center">
+              <Stack direction="row" sx={{ alignItems: 'center' }}>
                 <Typography variant="h6">Créer une nouvelle room</Typography>
                 <HelpTooltip title="Vous serez le maître de la room créée. Vous pourrez choisir le jeu de données, les labels ainsi que la configuration de la partie." />
               </Stack>
@@ -211,7 +211,7 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                   <MenuItem value="20">Moyen (20 secondes)</MenuItem>
                   <MenuItem value="30">Long (30 secondes)</MenuItem>
                 </Select>
-                <Stack direction="row" justifyContent="space-between" spacing={2}>
+                <Stack direction="row" spacing={2} sx={{ justifyContent: 'space-between' }}>
                   <Select<string> value={newRoomImageSet} displayEmpty fullWidth onChange={handleImageSetChange}>
                     <MenuItem value="">Sélectionne un ensemble d'images</MenuItem>
                     <MenuItem value="cards">Cartes</MenuItem>
@@ -242,22 +242,22 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                     </ImageList>
                   </Box>
                 ) : null}
-                <Stack direction="row" alignItems="center">
+                <Stack direction="row" sx={{ alignItems: 'center' }}>
                   <FormControlLabel
-                    control={<Switch checked={labelsSwitchChecked} onChange={(event) => setLabelsSwitchChecked(event.target.checked)} inputProps={{ 'aria-label': 'controlled' }} />}
+                    control={<Switch checked={labelsSwitchChecked} onChange={(event) => setLabelsSwitchChecked(event.target.checked)} slotProps={{ input: { 'aria-label': 'controlled' } }} />}
                     label="Préparer les labels à l'avance"
                   />
                   <HelpTooltip title="Cocher cette option permet de définir les labels à l'avance. Cela vous permet de ne pas avoir à catégoriser les images en cours de partie." />
                 </Stack>
                 <TransferImage key={newRoomImageSet} visible={labelsSwitchChecked} imagesList={selectedImages} callback={callbackLabels} />
-                <Stack direction="row" alignItems="center">
+                <Stack direction="row" sx={{ alignItems: 'center' }}>
                   <FormControlLabel
-                    control={<Switch checked={AISwitchChecked} onChange={(event) => setAISwitchChecked(event.target.checked)} inputProps={{ 'aria-label': 'controlled' }} />}
+                    control={<Switch checked={AISwitchChecked} onChange={(event) => setAISwitchChecked(event.target.checked)} slotProps={{ input: { 'aria-label': 'controlled' } }} />}
                     label="Ajouter une IA comme joueur (beta)"
                   />
                   <HelpTooltip title="Cocher cette option va ajouter une IA à la liste des joueurs. Elle va s'entraîner à chaque image et faire ses prédictions comme tout autre joueur. Le modèle est un MobileNet-V3-small pré-entrainé identique à celui de Teachable Machine de Google." />
                 </Stack>
-                <Stack direction="row" alignItems="center">
+                <Stack direction="row" sx={{ alignItems: 'center' }}>
                   <FormControlLabel
                     control={<Checkbox checked={newRoomSizeLimitChecked} onChange={handleCheckboxChange} color="primary" />}
                     label="Limiter le nombre de joueurs"

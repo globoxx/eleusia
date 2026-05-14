@@ -226,29 +226,30 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
 
   return (
     <>
-      <Grid container justifyContent="space-evenly" alignContent="flex-start" spacing={2}>
-        <Grid item textAlign="center" xs={12}>
+      <Grid container spacing={2} sx={{ justifyContent: 'space-evenly', alignContent: 'flex-start' }}>
+        <Grid size={12} sx={{ textAlign: 'center' }}>
           <Button variant="outlined" color="error" endIcon={<LogoutIcon />} onClick={leaveRoom} style={{ position: 'absolute', left: 20 }}>
             Quitter la partie
           </Button>
           <Typography variant="h3">Room {room}</Typography>
         </Grid>
-        <Grid container item textAlign="center" alignItems="center" direction="column" xs={8} spacing={2}>
-          <Grid container item justifyContent="space-evenly" alignItems="center" spacing={2}>
-            <Grid item textAlign="center" xs={6}>
+        <Grid size={8} sx={{ textAlign: 'center' }}>
+          <Stack spacing={2} sx={{ width: '100%', alignItems: 'center' }}>
+          <Grid container spacing={2} sx={{ justifyContent: 'space-evenly', alignItems: 'center' }}>
+            <Grid size={6} sx={{ textAlign: 'center' }}>
               <Typography variant="h6">Images refusées par le maître</Typography>
               <Paper sx={{ height: 200 }} elevation={3}>
                 <ImagesContainer images={refusedImages} category="Refusé" />
               </Paper>
             </Grid>
-            <Grid item textAlign="center" xs={6}>
+            <Grid size={6} sx={{ textAlign: 'center' }}>
               <Typography variant="h6">Images acceptées par le maître</Typography>
               <Paper sx={{ height: 200 }} elevation={3}>
                 <ImagesContainer images={acceptedImages} category="Accepté" />
               </Paper>
             </Grid>
           </Grid>
-          <Grid container item alignItems="center" justifyContent="center">
+          <Grid container sx={{ alignItems: 'center', justifyContent: 'center' }}>
             <Box sx={{ height: 200 }}>
               {currentImage ? (
                 <Box
@@ -260,10 +261,10 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
               ) : null}
             </Box>
           </Grid>
-          <Grid container item textAlign="center" alignItems="center">
+          <Grid container sx={{ textAlign: 'center', alignItems: 'center' }}>
             {isRoomCreator ? (
               isAutoRun ? (
-                <Grid item textAlign="center" xs={12}>
+                <Grid size={12} sx={{ textAlign: 'center' }}>
                   <Typography variant="h5">
                     {roomData.hasStarted
                       ? 'Les labels sont déjà prêts !'
@@ -273,12 +274,12 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
               ) : (
                 roomData.hasStarted && (
                   <>
-                    <Grid item textAlign="center" xs={6}>
+                    <Grid size={6} sx={{ textAlign: 'center' }}>
                       <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>
                         Refuser
                       </Button>
                     </Grid>
-                    <Grid item textAlign="center" xs={6}>
+                    <Grid size={6} sx={{ textAlign: 'center' }}>
                       <Button variant="contained" onClick={handleClickAccept} disabled={votingDisabled}>
                         Accepter
                       </Button>
@@ -288,7 +289,7 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
               )
             ) : roomData.hasStarted ? (
               <>
-                <Grid item textAlign="center" xs={12}>
+                <Grid size={12} sx={{ textAlign: 'center' }}>
                   <Slider
                     sx={{ width: 0.8 }}
                     defaultValue={0}
@@ -301,21 +302,22 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
                     onChange={handleDecisionChange}
                   />
                 </Grid>
-                <Grid item textAlign="center" xs={12}>
+                <Grid size={12} sx={{ textAlign: 'center' }}>
                   <Button variant="contained" onClick={() => handleClickVote(vote)} disabled={votingDisabled || timer <= 0}>
                     Confirmer
                   </Button>
                 </Grid>
               </>
             ) : (
-              <Grid item textAlign="center" xs={12}>
+              <Grid size={12} sx={{ textAlign: 'center' }}>
                 <Typography variant="h5">Le maître du jeu n'a pas encore démarré la partie !</Typography>
               </Grid>
             )}
           </Grid>
+          </Stack>
         </Grid>
-        <Grid item alignSelf="flex-start" xs={4}>
-          <Stack alignItems="center" justifyContent="flex-start" spacing={2}>
+        <Grid size={4} sx={{ alignSelf: 'flex-start' }}>
+          <Stack spacing={2} sx={{ alignItems: 'center', justifyContent: 'flex-start' }}>
             <Timer
               key={timerKey}
               timerKey={timerKey}

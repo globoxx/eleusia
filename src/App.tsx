@@ -44,7 +44,7 @@ function App() {
   }
 
   return (
-    <Box padding={2}>
+    <Box sx={{ p: 2 }}>
       {isInGame && roomData
         ? <GameBoard socket={socket} pseudo={pseudo} room={room} roomData={roomData} callbackLeaveRoom={callbackLeaveRoom} />
         : <Home socket={socket} callbackPseudoChange={callbackPseudoChange} callbackRoomChange={callbackRoomChange} callbackJoinRoom={callbackJoinRoom} />

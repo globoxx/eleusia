@@ -33,11 +33,11 @@ function RulesModal({open, handleClose}: {open: boolean, handleClose: () => void
         >
             <Fade in={open}>
                 <Box sx={style}>
-                <Grid container justifyContent="center" spacing={5}>
-                    <Grid item xs={12}>
+                <Grid container spacing={5} sx={{ justifyContent: 'center' }}>
+                    <Grid size={12}>
                         <Typography variant="h3" align="center">Eleus-IA: Dans la peau d'une IA</Typography>
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid size={12}>
                         <Typography variant="h4" sx={{ mb: 2 }}>But du jeu:</Typography>
                         <Typography variant="body1" sx={{ mb: 2 }} component="ol">
                             En rejoignant une room, vous rejoindrez d'autres joueurs dont l'objectif est d'apprendre à catégoriser des images qui vous seront présentées successivement.

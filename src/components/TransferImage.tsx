@@ -8,7 +8,7 @@ import ListItemIcon from '@mui/material/ListItemIcon'
 import Checkbox from '@mui/material/Checkbox'
 import Button from '@mui/material/Button'
 import Divider from '@mui/material/Divider'
-import { ListItemButton } from '@mui/material'
+import { ListItemButton, Stack } from '@mui/material'
 import { useEffect, useState } from 'react'
 
 function not(a: readonly string[], b: readonly string[]) {
@@ -84,8 +84,10 @@ function TransferImage({visible, imagesList, callback}: {visible: boolean, image
               numberOfChecked(items) !== items.length && numberOfChecked(items) !== 0
             }
             disabled={items.length === 0}
-            inputProps={{
-              'aria-label': 'all items selected',
+            slotProps={{
+              input: {
+                'aria-label': 'all items selected',
+              },
             }}
           />
         }
@@ -117,8 +119,10 @@ function TransferImage({visible, imagesList, callback}: {visible: boolean, image
                   checked={checked.indexOf(value) !== -1}
                   tabIndex={-1}
                   disableRipple
-                  inputProps={{
-                    'aria-labelledby': labelId,
+                  slotProps={{
+                    input: {
+                      'aria-labelledby': labelId,
+                    },
                   }}
                 />
               </ListItemIcon>
@@ -139,10 +143,10 @@ function TransferImage({visible, imagesList, callback}: {visible: boolean, image
   return (
     <>
         {visible &&
-        <Grid container spacing={2} justifyContent="center" flexWrap="nowrap" alignItems="center">
-            <Grid item flexGrow="1">{customList('Refusées', left)}</Grid>
-            <Grid item>
-                <Grid container direction="column" alignItems="center">
+        <Grid container spacing={2} sx={{ justifyContent: 'center', flexWrap: 'nowrap', alignItems: 'center' }}>
+            <Grid sx={{ flexGrow: 1 }}>{customList('Refusées', left)}</Grid>
+            <Grid>
+                <Stack sx={{ alignItems: 'center' }}>
                 <Button
                     sx={{ my: 0.5 }}
                     variant="outlined"
@@ -163,9 +167,9 @@ function TransferImage({visible, imagesList, callback}: {visible: boolean, image
                 >
                     &lt;
                 </Button>
-                </Grid>
+                </Stack>
             </Grid>
-            <Grid item flexGrow="1">{customList('Acceptées', right)}</Grid>
+            <Grid sx={{ flexGrow: 1 }}>{customList('Acceptées', right)}</Grid>
         </Grid>
         }
     </>

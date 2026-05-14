@@ -43,7 +43,7 @@ function EndOfGameModal({rule, open, users, pseudo, creatorPseudo, images, label
                     <Typography variant="h3" component="h2">
                         La partie est terminée !
                     </Typography>
-                    <Typography marginTop={5} sx={{marginBottom: 2}}>
+                    <Typography sx={{ mt: 5, mb: 2 }}>
                         La règle était : <b>{rule}</b>
                     </Typography>
 
