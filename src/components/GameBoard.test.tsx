@@ -22,6 +22,10 @@ vi.mock('./AIModel', () => ({
   default: aiModelMock,
 }));
 
+vi.mock('./Modals/EndOfGameModal', () => ({
+  default: ({ open }: { open: boolean }) => (open ? <div data-testid="end-of-game-modal" /> : null),
+}));
+
 type Handler = (...args: unknown[]) => void;
 
 function createSocketMock() {
@@ -117,6 +121,23 @@ test('creator controls pause and reveal actions', () => {
 
   expect(emit).toHaveBeenCalledWith('pause', 'room1');
   expect(emit).toHaveBeenCalledWith('endGame', 'room1');
+});
+
+test('does not render end of game modal before game is finished', () => {
+  const { socket } = createSocketMock();
+
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createRoomData({ hasFinished: false })} callbackLeaveRoom={vi.fn()} />);
+
+  expect(screen.queryByTestId('end-of-game-modal')).not.toBeInTheDocument();
+});
+
+test('renders end of game modal when game is finished', async () => {
+  const { socket } = createSocketMock();
+
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createRoomData({ hasFinished: true })} callbackLeaveRoom={vi.fn()} />);
+
+  expect(await screen.findByTestId('end-of-game-modal')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Room room1' })).toBeInTheDocument();
 });
 
 test('does not initialize AI model when room has no AI', () => {

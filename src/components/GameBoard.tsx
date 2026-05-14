@@ -1,18 +1,18 @@
 import PauseIcon from '@mui/icons-material/Pause';
 import PlayCircleFilledIcon from '@mui/icons-material/PlayCircleFilled';
 import LogoutIcon from '@mui/icons-material/Logout';
-import { Box, Grid, Paper, Slider, Stack, Typography } from '@mui/material';
+import { Box, CircularProgress, Grid, Paper, Slider, Stack, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import type { RoomData } from '../shared/types';
 import ImagesContainer from './ImagesContainer';
-import EndOfGameModal from './Modals/EndOfGameModal';
 import PointsModal from './Modals/PointsModal';
 import Timer from './Timer';
 import UsersTable from './UsersTable';
 
 const minPlayers = 1;
+const EndOfGameModal = React.lazy(() => import('./Modals/EndOfGameModal'));
 
 const marks = [
   { value: -1, label: 'Refuser' },
@@ -377,15 +377,19 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
         </Grid>
       </Grid>
       {!isRoomCreator && <PointsModal open={isPointsModalOpen} handleClose={handleClosePointsModal} points={modalPoints} />}
-      <EndOfGameModal
-        open={roomData.hasFinished}
-        rule={roomData.rule}
-        users={roomData.users}
-        pseudo={pseudo}
-        creatorPseudo={roomData.creator}
-        images={allImages}
-        labels={allLabels}
-      />
+      {roomData.hasFinished ? (
+        <Suspense fallback={<CircularProgress aria-label="Chargement des résultats" />}>
+          <EndOfGameModal
+            open={roomData.hasFinished}
+            rule={roomData.rule}
+            users={roomData.users}
+            pseudo={pseudo}
+            creatorPseudo={roomData.creator}
+            images={allImages}
+            labels={allLabels}
+          />
+        </Suspense>
+      ) : null}
     </>
   );
 }
