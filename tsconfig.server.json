@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "es2019",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "node16",
+    "moduleResolution": "node16",
     "rootDir": ".",
     "outDir": "dist/server",
     "strict": true,
