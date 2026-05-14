@@ -42,7 +42,7 @@ app.use(cors());
 app.use(express.static(staticPath));
 app.use('/images', express.static(imagesFolder));
 
-app.get('*', function (_req, res) {
+app.use((_req, res) => {
   const indexPath = path.join(staticPath, 'index.html');
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
