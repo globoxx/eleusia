@@ -18,7 +18,6 @@ import type {
   RoomData,
   RoomStatus,
   RoomTemplatePayload,
-  VotePayload,
 } from './src/shared/types';
 import {
   AI_PSEUDO,
@@ -32,28 +31,16 @@ import {
   hasHumanUsers,
   isValidPseudo,
   isValidRoomId,
-  normalizeVote,
   setRoomStatus,
   toPublicUser,
   validateCreateRoomInput,
 } from './src/server/gameState';
 import { closeCurrentRound, startNextRound } from './src/server/roundLifecycle';
+import { createSocketSessionStore } from './src/server/socketSessionStore';
+import { validateVote } from './src/server/voteValidation';
 import { authenticateTeacher } from './src/server/auth';
 import { setupTeacherRoutes } from './src/server/teacherRoutes';
 import { createTeacherStoreFromEnv, type TeacherStore } from './src/server/teacherStore';
-
-interface CreatorSocketSession {
-  roomId: string;
-  role: 'creator';
-}
-
-interface PlayerSocketSession {
-  roomId: string;
-  role: 'player';
-  pseudo: string;
-}
-
-type SocketSession = CreatorSocketSession | PlayerSocketSession;
 
 interface CreateGameServerOptions {
   port?: number;
@@ -106,7 +93,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
   });
 
   const data: Data = {};
-  const sessions = new Map<string, SocketSession>();
+  const socketSessions = createSocketSessionStore(io);
   const cleanupTimers = new Map<string, NodeJS.Timeout>();
   const reconnectTimers = new Map<string, NodeJS.Timeout>();
   const reconnectGraceMs = options.reconnectGraceMs ?? RECONNECT_GRACE_MS;
@@ -134,14 +121,14 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
         return;
       }
 
-      if (isSocketAttached(socket)) {
+      if (socketSessions.isAttached(socket)) {
         rejectAck(socket, 'alreadyInRoom', ack);
         return;
       }
 
       const creatorToken = randomUUID();
       data[payload.roomId] = createRoomData(payload, socket.id, allImages, creatorToken);
-      attachCreatorSocket(payload.roomId, socket);
+      socketSessions.attachCreator(payload.roomId, socket);
       cancelRoomCleanup(payload.roomId);
 
       log('room_created', { roomId: payload.roomId });
@@ -167,7 +154,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
         return;
       }
 
-      if (isSocketAttached(socket)) {
+      if (socketSessions.isAttached(socket)) {
         rejectAck(socket, 'alreadyInRoom', ack);
         return;
       }
@@ -206,7 +193,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       roomData.templateId = template.id;
       roomData.persistentSessionId = persistentSession.id;
       data[payload.roomId] = roomData;
-      attachCreatorSocket(payload.roomId, socket);
+      socketSessions.attachCreator(payload.roomId, socket);
       cancelRoomCleanup(payload.roomId);
 
       log('room_template_launched', { roomId: payload.roomId, templateId: template.id, teacherId: teacher.id });
@@ -240,14 +227,14 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
         return;
       }
 
-      if (isSocketAttached(socket)) {
+      if (socketSessions.isAttached(socket)) {
         rejectAck(socket, 'alreadyInRoom', ack);
         return;
       }
 
       const participantToken = randomUUID();
       roomData.users[payload.pseudo] = createUser(socket.id, participantToken);
-      attachPlayerSocket(payload.roomId, payload.pseudo, socket);
+      socketSessions.attachPlayer(payload.roomId, payload.pseudo, socket);
       cancelRoomCleanup(payload.roomId);
 
       log('room_joined', { roomId: payload.roomId, pseudo: payload.pseudo });
@@ -270,13 +257,13 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
 
       const previousSocketId = user.socketId;
       if (previousSocketId && previousSocketId !== socket.id) {
-        replaceSocket(previousSocketId, payload.roomId);
+        socketSessions.replaceSocket(previousSocketId, payload.roomId);
       }
 
       user.socketId = socket.id;
       user.connected = true;
       user.disconnectedAt = null;
-      attachPlayerSocket(payload.roomId, payload.pseudo, socket);
+      socketSessions.attachPlayer(payload.roomId, payload.pseudo, socket);
       cancelReconnectTimer(payload.roomId, payload.pseudo);
       cancelRoomCleanup(payload.roomId);
 
@@ -299,13 +286,13 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
 
       const previousSocketId = roomData.creator.socketId;
       if (previousSocketId && previousSocketId !== socket.id) {
-        replaceSocket(previousSocketId, payload.roomId);
+        socketSessions.replaceSocket(previousSocketId, payload.roomId);
       }
 
       roomData.creator.socketId = socket.id;
       roomData.creator.connected = true;
       roomData.creator.disconnectedAt = null;
-      attachCreatorSocket(payload.roomId, socket);
+      socketSessions.attachCreator(payload.roomId, socket);
       cancelReconnectTimer(payload.roomId, 'creator');
       cancelRoomCleanup(payload.roomId);
 
@@ -330,18 +317,26 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     });
 
     socket.on('vote', (payload: unknown) => {
-      const votePayload = validateVotePayload(socket, payload, false);
-      if (!votePayload) return;
+      const result = validateVote({
+        payload,
+        roomData: getVoteRoomData(payload),
+        session: socketSessions.get(socket),
+        socketId: socket.id,
+        isAiVote: false,
+      });
+      if (!result.ok) {
+        reject(socket, result.reason);
+        return;
+      }
 
-      const session = getSocketSession(socket);
-      if (!session) return;
-
+      const { actor, votePayload } = result;
       const roomData = data[votePayload.roomId];
-      if (session.role === 'creator') {
+      if (actor === 'creator') {
         roomData.creator.vote = votePayload.vote;
         roomData.creator.voteRoundId = votePayload.roundId;
-      } else if (session.pseudo) {
-        const user = roomData.users[session.pseudo];
+      } else if (actor !== 'ai') {
+        const user = roomData.users[actor.pseudo];
+        if (!user) return;
         user.vote = votePayload.vote;
         user.voteRoundId = votePayload.roundId;
       }
@@ -352,9 +347,19 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     });
 
     socket.on('aiVote', (payload: unknown) => {
-      const votePayload = validateVotePayload(socket, payload, true);
-      if (!votePayload) return;
+      const result = validateVote({
+        payload,
+        roomData: getVoteRoomData(payload),
+        session: socketSessions.get(socket),
+        socketId: socket.id,
+        isAiVote: true,
+      });
+      if (!result.ok) {
+        reject(socket, result.reason);
+        return;
+      }
 
+      const { votePayload } = result;
       const roomData = data[votePayload.roomId];
       const aiUser = roomData.users[AI_PSEUDO];
       if (!aiUser) {
@@ -421,43 +426,6 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     }
   }
 
-  function attachCreatorSocket(roomId: string, socket: Socket) {
-    sessions.set(socket.id, { roomId, role: 'creator' });
-    socket.join(roomId);
-  }
-
-  function attachPlayerSocket(roomId: string, pseudo: string, socket: Socket) {
-    sessions.set(socket.id, { roomId, role: 'player', pseudo });
-    socket.join(roomId);
-  }
-
-  function isSocketAttached(socket: Socket) {
-    return sessions.has(socket.id);
-  }
-
-  function getSocketSession(socket: Socket) {
-    return sessions.get(socket.id) ?? null;
-  }
-
-  function getCreatorSession(socket: Socket, roomId: unknown): CreatorSocketSession | null {
-    if (!isValidRoomId(roomId)) return null;
-
-    const session = getSocketSession(socket);
-    return session?.role === 'creator' && session.roomId === roomId ? session : null;
-  }
-
-  function getPlayerSession(socket: Socket, roomId: unknown): PlayerSocketSession | null {
-    if (!isValidRoomId(roomId)) return null;
-
-    const session = getSocketSession(socket);
-    return session?.role === 'player' && session.roomId === roomId ? session : null;
-  }
-
-  function replaceSocket(socketId: string, roomId: string) {
-    sessions.delete(socketId);
-    io.sockets.sockets.get(socketId)?.leave(roomId);
-  }
-
   function rejectAck(socket: Socket, reason: string, ack?: RoomAckCallback) {
     log('action_rejected', { socketId: socket.id, reason });
     ack?.({ ok: false, reason });
@@ -471,109 +439,22 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
   function isCreatorSocket(socket: Socket, roomId: unknown): roomId is string {
     if (!isValidRoomId(roomId)) return false;
 
-    const session = getCreatorSession(socket, roomId);
+    const session = socketSessions.getCreator(socket, roomId);
     const roomData = data[roomId];
     return Boolean(session && roomData && session.roomId === roomId && session.role === 'creator' && roomData.creator.socketId === socket.id && roomData.creator.connected);
   }
 
-  function validateVotePayload(socket: Socket, payload: unknown, isAiVote: boolean): VotePayload | null {
-    if (!isVotePayload(payload)) {
-      reject(socket, isAiVote ? 'invalidAiVote' : 'invalidVote');
-      return null;
-    }
-
-    const roomData = data[payload.roomId];
-    const vote = normalizeVote(payload.vote);
-    if (!roomData || vote === null) {
-      reject(socket, isAiVote ? 'invalidAiVote' : 'invalidVote');
-      return null;
-    }
-
-    if (isFinished(roomData.status) || isPaused(roomData.status) || !roomData.currentRoundId) {
-      reject(socket, 'voteClosed');
-      return null;
-    }
-
-    if (payload.roundId !== roomData.currentRoundId) {
-      reject(socket, 'staleRound');
-      return null;
-    }
-
-    if (isAiVote) {
-      if (roomData.status !== 'running' || roomData.timer <= 0) {
-        reject(socket, 'voteClosed');
-        return null;
-      }
-
-      if (!isCreatorSocket(socket, payload.roomId) || !roomData.hasAI) {
-        reject(socket, 'invalidAiVote');
-        return null;
-      }
-
-      const aiUser = roomData.users[AI_PSEUDO];
-      if (!aiUser || aiUser.voteRoundId === payload.roundId) {
-        reject(socket, 'duplicateVote');
-        return null;
-      }
-
-      return { ...payload, vote };
-    }
-
-    const session = getSocketSession(socket);
-    if (!session || session.roomId !== payload.roomId) {
-      reject(socket, 'invalidVote');
-      return null;
-    }
-
-    if (session.role === 'creator') {
-      if (roomData.creator.socketId !== socket.id || !roomData.creator.connected) {
-        reject(socket, 'invalidVote');
-        return null;
-      }
-
-      if (roomData.status !== 'waitingCreator' && (roomData.status !== 'running' || roomData.timer <= 0)) {
-        reject(socket, 'voteClosed');
-        return null;
-      }
-
-      if (roomData.creator.voteRoundId === payload.roundId) {
-        reject(socket, 'duplicateVote');
-        return null;
-      }
-
-      return { ...payload, vote };
-    }
-
-    const playerSession = getPlayerSession(socket, payload.roomId);
-    if (!playerSession) {
-      reject(socket, 'invalidVote');
-      return null;
-    }
-
-    const user = roomData.users[playerSession.pseudo];
-    if (!user || user.socketId !== socket.id || !user.connected) {
-      reject(socket, 'invalidVote');
-      return null;
-    }
-
-    if (roomData.status !== 'running' || roomData.timer <= 0) {
-      reject(socket, 'voteClosed');
-      return null;
-    }
-
-    if (user.voteRoundId === payload.roundId) {
-      reject(socket, 'duplicateVote');
-      return null;
-    }
-
-    return { ...payload, vote };
+  function getVoteRoomData(payload: unknown) {
+    if (!payload || typeof payload !== 'object') return undefined;
+    const roomId = (payload as Record<string, unknown>).roomId;
+    return typeof roomId === 'string' ? data[roomId] : undefined;
   }
 
   function detachSocket(socket: Socket, explicitLeave: boolean) {
-    const session = getSocketSession(socket);
+    const session = socketSessions.get(socket);
     if (!session) return;
 
-    sessions.delete(socket.id);
+    socketSessions.detachSocketId(socket.id);
     socket.leave(session.roomId);
 
     const roomData = data[session.roomId];
@@ -778,7 +659,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     io,
     port,
     data,
-    sessions,
+    sessions: socketSessions.sessions,
     close,
   };
 }
@@ -872,13 +753,6 @@ function isLaunchRoomTemplatePayload(payload: unknown): payload is LaunchRoomTem
   return typeof input.templateId === 'string' && input.templateId.length > 0 && isValidRoomId(input.roomId);
 }
 
-function isVotePayload(payload: unknown): payload is VotePayload {
-  if (!payload || typeof payload !== 'object') return false;
-  const input = payload as Record<string, unknown>;
-
-  return isValidRoomId(input.roomId) && typeof input.roundId === 'number' && Number.isInteger(input.roundId) && typeof input.vote === 'number';
-}
-
 function templateToPayload(template: RoomTemplatePayload): RoomTemplatePayload {
   return {
     name: template.name,
@@ -918,5 +792,4 @@ if (require.main === module) {
   const server = createGameServer();
   server.httpServer.listen(server.port, () => console.log(`Listening on port ${server.port.toString()}`));
 }
-
 

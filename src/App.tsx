@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { io, Socket } from "socket.io-client";
 import GameBoard from './components/GameBoard';
 import Home from './components/Home'
@@ -24,27 +24,23 @@ type StoredSession =
 
 type RoomRole = 'creator' | 'player';
 
-interface LegacyStoredSession {
-  roomId: string;
-  pseudo: string;
-  participantToken: string;
-}
-
 function readStoredSession(): StoredSession | null {
   try {
     const raw = sessionStorage.getItem(sessionStorageKey);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<StoredSession & LegacyStoredSession>;
+    const parsed = JSON.parse(raw) as Partial<StoredSession>;
     if (parsed.role === 'creator' && typeof parsed.roomId === 'string' && typeof parsed.creatorToken === 'string') {
       return parsed as StoredSession;
     }
-    if ((parsed.role === 'player' || !parsed.role) && typeof parsed.roomId === 'string' && typeof parsed.pseudo === 'string' && typeof parsed.participantToken === 'string') {
+    if (parsed.role === 'player' && typeof parsed.roomId === 'string' && typeof parsed.pseudo === 'string' && typeof parsed.participantToken === 'string') {
       return { role: 'player', roomId: parsed.roomId, pseudo: parsed.pseudo, participantToken: parsed.participantToken };
     }
   } catch (error) {
     sessionStorage.removeItem(sessionStorageKey);
+    return null;
   }
 
+  sessionStorage.removeItem(sessionStorageKey);
   return null;
 }
 
@@ -65,6 +61,31 @@ function App() {
   const [connectionError, setConnectionError] = useState(false)
   const [teacher, setTeacher] = useState<TeacherPublic | null>(null)
 
+  const enterPlayerSession = ({ roomId, pseudo: nextPseudo, participantToken }: { roomId: string; pseudo: string; participantToken: string }) => {
+    setRoom(roomId)
+    setPseudo(nextPseudo)
+    setRole('player')
+    setIsInGame(true)
+    saveStoredSession({ role: 'player', roomId, pseudo: nextPseudo, participantToken })
+  }
+
+  const enterCreatorSession = ({ roomId, creatorToken }: { roomId: string; creatorToken: string }) => {
+    setRoom(roomId)
+    setPseudo('')
+    setRole('creator')
+    setIsInGame(true)
+    saveStoredSession({ role: 'creator', roomId, creatorToken })
+  }
+
+  const leaveCurrentSession = () => {
+    setRoom('')
+    setPseudo('')
+    setRole('player')
+    setIsInGame(false)
+    setRoomData(null)
+    clearStoredSession()
+  }
+
   useEffect(()=>{
     const tryReconnect = () => {
       const storedSession = readStoredSession();
@@ -78,20 +99,11 @@ function App() {
 
         socket.emit('reconnectCreator', payload, (ack: RoomAck) => {
           if (ack.ok && ack.role === 'creator') {
-            setPseudo('');
-            setRoom(ack.roomId);
-            setRole('creator');
-            setIsInGame(true);
-            saveStoredSession({ role: 'creator', roomId: ack.roomId, creatorToken: ack.creatorToken });
+            enterCreatorSession({ roomId: ack.roomId, creatorToken: ack.creatorToken });
             return;
           }
 
-          clearStoredSession();
-          setRoom('');
-          setPseudo('');
-          setRole('player');
-          setIsInGame(false);
-          setRoomData(null);
+          leaveCurrentSession();
         });
         return;
       }
@@ -104,20 +116,11 @@ function App() {
 
       socket.emit('reconnectRoom', payload, (ack: RoomAck) => {
         if (ack.ok && ack.role === 'player') {
-          setPseudo(ack.pseudo);
-          setRoom(ack.roomId);
-          setRole('player');
-          setIsInGame(true);
-          saveStoredSession({ role: 'player', roomId: ack.roomId, pseudo: ack.pseudo, participantToken: ack.participantToken });
+          enterPlayerSession({ roomId: ack.roomId, pseudo: ack.pseudo, participantToken: ack.participantToken });
           return;
         }
 
-        clearStoredSession();
-        setRoom('');
-        setPseudo('');
-        setRole('player');
-        setIsInGame(false);
-        setRoomData(null);
+        leaveCurrentSession();
       });
     };
 
@@ -164,26 +167,13 @@ function App() {
   }, []);
 
   const onPlayerJoined = ({ roomId, pseudo: nextPseudo, participantToken }: { roomId: string; pseudo: string; participantToken: string }) => {
-    setRoom(roomId)
-    setPseudo(nextPseudo)
-    setRole('player')
-    setIsInGame(true)
-    saveStoredSession({ role: 'player', roomId, pseudo: nextPseudo, participantToken })
+    enterPlayerSession({ roomId, pseudo: nextPseudo, participantToken })
   }
   const onCreatorJoined = ({ roomId, creatorToken }: { roomId: string; creatorToken: string }) => {
-    setRoom(roomId)
-    setPseudo('')
-    setRole('creator')
-    setIsInGame(true)
-    saveStoredSession({ role: 'creator', roomId, creatorToken })
+    enterCreatorSession({ roomId, creatorToken })
   }
   const callbackLeaveRoom = () => {
-    setRoom('')
-    setPseudo('')
-    setRole('player')
-    setIsInGame(false)
-    setRoomData(null)
-    clearStoredSession()
+    leaveCurrentSession()
   }
 
   return (
