@@ -1,4 +1,5 @@
 import type { ClientRoomData, CreatorRoomData, ImageCatalog, PublicRoomData, PublicUser, RoomData, RoomStatus, User } from '../shared/types';
+import { isFinished } from '../shared/roomStatus';
 
 export const AI_PSEUDO = 'Eleus-IA';
 export const AI_SOCKET_ID = 'ai';
@@ -143,18 +144,14 @@ export function createRoomData(input: CreateRoomInput, creatorSocketId: string, 
     autoRun: input.autoRun,
     hasAI: input.hasAI,
     status: 'lobby',
-    paused: false,
     refusedImages: input.autoRun ? input.refusedImages : [],
     acceptedImages: input.autoRun ? input.acceptedImages : [],
-    hasStarted: false,
-    hasFinished: false,
     timer: input.roundDuration,
     images: [...images],
     currentImage: null,
     currentRoundId: null,
     currentRoundStartedAt: null,
     nextRoundId: 1,
-    waitingForCreator: false,
     roundHistory: [],
     sizeLimit: input.sizeLimit,
     users: {
@@ -165,10 +162,6 @@ export function createRoomData(input: CreateRoomInput, creatorSocketId: string, 
 
 export function setRoomStatus(roomData: RoomData, status: RoomStatus) {
   roomData.status = status;
-  roomData.hasStarted = status !== 'lobby';
-  roomData.hasFinished = status === 'finished' || status === 'expired';
-  roomData.paused = status === 'paused';
-  roomData.waitingForCreator = status === 'waitingCreator';
 }
 
 export function toPublicUser(user: User): PublicUser {
@@ -187,15 +180,11 @@ export function buildPublicRoomData(roomData: RoomData): PublicRoomData {
     creatorConnected: roomData.creator.connected,
     autoRun: roomData.autoRun,
     hasAI: roomData.hasAI,
-    paused: roomData.status === 'paused',
-    hasStarted: roomData.status !== 'lobby',
-    hasFinished: roomData.status === 'finished' || roomData.status === 'expired',
     timer: roomData.timer,
     currentImage: roomData.currentImage,
     currentRoundId: roomData.currentRoundId,
-    waitingForCreator: roomData.status === 'waitingCreator',
     roundHistory: roomData.roundHistory,
-    revealedRule: roomData.status === 'finished' || roomData.status === 'expired' ? roomData.rule : null,
+    revealedRule: isFinished(roomData.status) ? roomData.rule : null,
     sizeLimit: roomData.sizeLimit,
     users: Object.fromEntries(Object.entries(roomData.users).map(([pseudo, user]) => [pseudo, toPublicUser(user)])),
   };

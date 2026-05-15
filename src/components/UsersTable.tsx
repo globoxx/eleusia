@@ -8,6 +8,7 @@ import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import type { ClientRoomData, PublicUser } from '../shared/types';
 import { TableFooter, Typography } from '@mui/material';
+import { isLobby } from '../shared/roomStatus';
 
 function UsersTable({roomData, pseudo}: {roomData: ClientRoomData, pseudo: string}) {
     return (
@@ -33,7 +34,7 @@ function UsersTable({roomData, pseudo}: {roomData: ClientRoomData, pseudo: strin
                 ))}
                 </TableBody>
                 <TableFooter>
-                    {!roomData.hasStarted && (
+                    {isLobby(roomData.status) && (
                         <TableCell align="center" colSpan={3}>
                             <Typography variant="h6">{"Nombre de joueurs: " + Object.keys(roomData.users).filter((userPseudo) => userPseudo !== 'Eleus-IA').length}</Typography>
                         </TableCell>

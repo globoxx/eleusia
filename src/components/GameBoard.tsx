@@ -6,6 +6,7 @@ import Button from '@mui/material/Button';
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import type { ClientRoomData, CreatorRoomData, NewRoundPayload } from '../shared/types';
+import { isFinished, isLobby, isPaused } from '../shared/roomStatus';
 import ImagesContainer from './ImagesContainer';
 import PointsModal from './Modals/PointsModal';
 import Timer from './Timer';
@@ -67,7 +68,7 @@ type GameBoardProps = {
   pseudo: string;
   room: string;
   roomData: ClientRoomData;
-  isCreator: boolean;
+  role: 'creator' | 'player';
   callbackLeaveRoom: () => void;
 };
 
@@ -75,7 +76,7 @@ function isCreatorRoomData(roomData: ClientRoomData): roomData is CreatorRoomDat
   return 'rule' in roomData;
 }
 
-function GameBoard({ socket, pseudo, room, roomData, isCreator: isRoomCreator, callbackLeaveRoom }: GameBoardProps) {
+function GameBoard({ socket, pseudo, room, roomData, role, callbackLeaveRoom }: GameBoardProps) {
   const [timer, setTimer] = useState<number>(0);
   const [timerKey, setTimerKey] = useState<number>(0);
   const [waitOnCreator, setWaitOnCreator] = useState(false);
@@ -89,6 +90,10 @@ function GameBoard({ socket, pseudo, room, roomData, isCreator: isRoomCreator, c
   const [modalPoints, setModalPoints] = useState(0);
 
   const isAutoRun = roomData.autoRun;
+  const isRoomCreator = role === 'creator';
+  const hasStarted = !isLobby(roomData.status);
+  const hasFinished = isFinished(roomData.status);
+  const paused = isPaused(roomData.status);
   const acceptedImages = roomData.roundHistory.filter((round) => round.label === 'Accepté').map((round) => round.image);
   const refusedImages = roomData.roundHistory.filter((round) => round.label === 'Refusé').map((round) => round.image);
 
@@ -278,13 +283,13 @@ function GameBoard({ socket, pseudo, room, roomData, isCreator: isRoomCreator, c
                 isAutoRun ? (
                   <Grid size={12} sx={{ textAlign: 'center' }}>
                     <Typography variant="h5">
-                      {roomData.hasStarted
+                      {hasStarted
                         ? 'Les labels sont déjà prêts !'
                         : "Vous n'avez plus qu'à démarrer la partie quand vous êtes prêt !"}
                     </Typography>
                   </Grid>
                 ) : (
-                  roomData.hasStarted && (
+                  hasStarted && (
                     <>
                       <Grid size={6} sx={{ textAlign: 'center' }}>
                         <Button variant="contained" onClick={handleClickRefuse} disabled={votingDisabled}>
@@ -299,7 +304,7 @@ function GameBoard({ socket, pseudo, room, roomData, isCreator: isRoomCreator, c
                     </>
                   )
                 )
-              ) : roomData.hasStarted ? (
+              ) : hasStarted ? (
                 <>
                   <Grid size={12} sx={{ textAlign: 'center' }}>
                     <Slider
@@ -334,21 +339,21 @@ function GameBoard({ socket, pseudo, room, roomData, isCreator: isRoomCreator, c
               key={timerKey}
               timerKey={timerKey}
               roundDuration={roomData.roundDuration}
-              isPlaying={roomData.hasStarted && !roomData.hasFinished && !roomData.paused}
+              isPlaying={hasStarted && !hasFinished && !paused}
             />
             {!isRoomCreator && <Typography variant="h6">{'Score: ' + (roomData.users[pseudo] ? roomData.users[pseudo].totalScore : 0)}</Typography>}
             <Box sx={{ border: 1, m: 5, marginBottom: 2 }}>
               <UsersTable roomData={roomData} pseudo={pseudo} />
             </Box>
-            {isRoomCreator && !roomData.hasStarted ? (
+            {isRoomCreator && !hasStarted ? (
               <Button variant="contained" onClick={handleClickStartGame} disabled={Object.keys(roomData.users).filter((userPseudo) => userPseudo !== 'Eleus-IA').length < minPlayers}>
                 Démarrer la partie
               </Button>
             ) : null}
-            {isRoomCreator && roomData.hasStarted && !roomData.hasFinished ? (
+            {isRoomCreator && hasStarted && !hasFinished ? (
               <Stack direction="row" spacing={2}>
-                <Button startIcon={!roomData.paused ? <PauseIcon /> : <PlayCircleFilledIcon />} variant="outlined" onClick={handleClickPause}>
-                  {!roomData.paused ? 'Pause' : 'Reprendre'}
+                <Button startIcon={!paused ? <PauseIcon /> : <PlayCircleFilledIcon />} variant="outlined" onClick={handleClickPause}>
+                  {!paused ? 'Pause' : 'Reprendre'}
                 </Button>
                 <Button variant="contained" color="error" onClick={handleClickRevealRule}>
                   Révéler la règle
@@ -359,10 +364,10 @@ function GameBoard({ socket, pseudo, room, roomData, isCreator: isRoomCreator, c
         </Grid>
       </Grid>
       {!isRoomCreator && <PointsModal open={isPointsModalOpen} handleClose={handleClosePointsModal} points={modalPoints} />}
-      {roomData.hasFinished ? (
+      {hasFinished ? (
         <Suspense fallback={<CircularProgress aria-label="Chargement des résultats" />}>
           <EndOfGameModal
-            open={roomData.hasFinished}
+            open={hasFinished}
             rule={roomData.revealedRule ?? ''}
             pseudo={pseudo}
             isCreator={isRoomCreator}

@@ -5,13 +5,13 @@ import { createServer } from 'http';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { Server, Socket } from 'socket.io';
+import { isFinished, isPaused } from './src/shared/roomStatus';
 import type {
   CreateRoomPayload,
   Data,
   ImageCatalog,
   JoinRoomPayload,
   LaunchRoomTemplatePayload,
-  ParticipantRoundResult,
   ReconnectCreatorPayload,
   ReconnectRoomPayload,
   RoomAck,
@@ -26,7 +26,6 @@ import {
   RECONNECT_GRACE_MS,
   ROOM_CLEANUP_DELAY_MS,
   buildClientRoomData,
-  calculatePoints,
   countPlayers,
   createRoomData,
   createUser,
@@ -38,15 +37,23 @@ import {
   toPublicUser,
   validateCreateRoomInput,
 } from './src/server/gameState';
+import { closeCurrentRound, startNextRound } from './src/server/roundLifecycle';
 import { authenticateTeacher } from './src/server/auth';
 import { setupTeacherRoutes } from './src/server/teacherRoutes';
 import { createTeacherStoreFromEnv, type TeacherStore } from './src/server/teacherStore';
 
-interface SocketSession {
+interface CreatorSocketSession {
   roomId: string;
-  role: 'creator' | 'player';
-  pseudo?: string;
+  role: 'creator';
 }
+
+interface PlayerSocketSession {
+  roomId: string;
+  role: 'player';
+  pseudo: string;
+}
+
+type SocketSession = CreatorSocketSession | PlayerSocketSession;
 
 interface CreateGameServerOptions {
   port?: number;
@@ -112,30 +119,29 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
 
     socket.on('createRoom', (payload: unknown, ack?: RoomAckCallback) => {
       if (!isCreateRoomPayload(payload)) {
-        reject(socket, 'invalidRoom', ack);
+        rejectAck(socket, 'invalidRoom', ack);
         return;
       }
 
       const validation = validateCreateRoomInput(payload, allImages);
       if (!validation.ok) {
-        reject(socket, validation.reason, ack);
+        rejectAck(socket, validation.reason, ack);
         return;
       }
 
       if (payload.roomId in data) {
-        reject(socket, 'roomAlreadyExists', ack);
+        rejectAck(socket, 'roomAlreadyExists', ack);
         return;
       }
 
-      if (sessions.has(socket.id)) {
-        reject(socket, 'alreadyInRoom', ack);
+      if (isSocketAttached(socket)) {
+        rejectAck(socket, 'alreadyInRoom', ack);
         return;
       }
 
       const creatorToken = randomUUID();
       data[payload.roomId] = createRoomData(payload, socket.id, allImages, creatorToken);
-      sessions.set(socket.id, { roomId: payload.roomId, role: 'creator' });
-      socket.join(payload.roomId);
+      attachCreatorSocket(payload.roomId, socket);
       cancelRoomCleanup(payload.roomId);
 
       log('room_created', { roomId: payload.roomId });
@@ -146,29 +152,29 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     socket.on('launchRoomTemplate', async (payload: unknown, ack?: RoomAckCallback) => {
       try {
       if (!isLaunchRoomTemplatePayload(payload)) {
-        reject(socket, 'invalidTemplateLaunch', ack);
+        rejectAck(socket, 'invalidTemplateLaunch', ack);
         return;
       }
 
       if (!teacherStore.available) {
-        reject(socket, 'teacherStorageUnavailable', ack);
+        rejectAck(socket, 'teacherStorageUnavailable', ack);
         return;
       }
 
       const teacher = await authenticateTeacher(socket.request.headers, teacherStore);
       if (!teacher) {
-        reject(socket, 'notAuthenticated', ack);
+        rejectAck(socket, 'notAuthenticated', ack);
         return;
       }
 
-      if (sessions.has(socket.id)) {
-        reject(socket, 'alreadyInRoom', ack);
+      if (isSocketAttached(socket)) {
+        rejectAck(socket, 'alreadyInRoom', ack);
         return;
       }
 
       const template = await teacherStore.getRoomTemplate(teacher.id, payload.templateId);
       if (!template) {
-        reject(socket, 'templateNotFound', ack);
+        rejectAck(socket, 'templateNotFound', ack);
         return;
       }
 
@@ -178,11 +184,11 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       };
       const validation = validateCreateRoomInput(createPayload, allImages);
       if (!validation.ok) {
-        reject(socket, validation.reason, ack);
+        rejectAck(socket, validation.reason, ack);
         return;
       }
       if (payload.roomId in data) {
-        reject(socket, 'roomAlreadyExists', ack);
+        rejectAck(socket, 'roomAlreadyExists', ack);
         return;
       }
 
@@ -200,8 +206,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       roomData.templateId = template.id;
       roomData.persistentSessionId = persistentSession.id;
       data[payload.roomId] = roomData;
-      sessions.set(socket.id, { roomId: payload.roomId, role: 'creator' });
-      socket.join(payload.roomId);
+      attachCreatorSocket(payload.roomId, socket);
       cancelRoomCleanup(payload.roomId);
 
       log('room_template_launched', { roomId: payload.roomId, templateId: template.id, teacherId: teacher.id });
@@ -209,41 +214,40 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       emitRoomData(payload.roomId);
       } catch (error: unknown) {
         log('room_template_launch_failed', { error: String(error) });
-        reject(socket, 'templateLaunchFailed', ack);
+        rejectAck(socket, 'templateLaunchFailed', ack);
       }
     });
 
     socket.on('joinRoom', (payload: unknown, ack?: RoomAckCallback) => {
       if (!isJoinRoomPayload(payload)) {
-        reject(socket, 'invalidJoin', ack);
+        rejectAck(socket, 'invalidJoin', ack);
         return;
       }
 
       const roomData = data[payload.roomId];
       if (!roomData || roomData.status !== 'lobby') {
-        reject(socket, 'roomNotFound', ack);
+        rejectAck(socket, 'roomNotFound', ack);
         return;
       }
 
       if (payload.pseudo in roomData.users) {
-        reject(socket, 'pseudoAlreadyExists', ack);
+        rejectAck(socket, 'pseudoAlreadyExists', ack);
         return;
       }
 
       if (countPlayers(roomData) >= roomData.sizeLimit) {
-        reject(socket, 'roomFull', ack);
+        rejectAck(socket, 'roomFull', ack);
         return;
       }
 
-      if (sessions.has(socket.id)) {
-        reject(socket, 'alreadyInRoom', ack);
+      if (isSocketAttached(socket)) {
+        rejectAck(socket, 'alreadyInRoom', ack);
         return;
       }
 
       const participantToken = randomUUID();
       roomData.users[payload.pseudo] = createUser(socket.id, participantToken);
-      sessions.set(socket.id, { roomId: payload.roomId, role: 'player', pseudo: payload.pseudo });
-      socket.join(payload.roomId);
+      attachPlayerSocket(payload.roomId, payload.pseudo, socket);
       cancelRoomCleanup(payload.roomId);
 
       log('room_joined', { roomId: payload.roomId, pseudo: payload.pseudo });
@@ -253,28 +257,26 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
 
     socket.on('reconnectRoom', (payload: unknown, ack?: RoomAckCallback) => {
       if (!isReconnectRoomPayload(payload)) {
-        reject(socket, 'invalidReconnect', ack);
+        rejectAck(socket, 'invalidReconnect', ack);
         return;
       }
 
       const roomData = data[payload.roomId];
       const user = roomData?.users[payload.pseudo];
-      if (!roomData || !user || user.participantToken !== payload.participantToken || isTerminalStatus(roomData.status)) {
-        reject(socket, 'invalidReconnect', ack);
+      if (!roomData || !user || user.participantToken !== payload.participantToken || isFinished(roomData.status)) {
+        rejectAck(socket, 'invalidReconnect', ack);
         return;
       }
 
       const previousSocketId = user.socketId;
       if (previousSocketId && previousSocketId !== socket.id) {
-        sessions.delete(previousSocketId);
-        io.sockets.sockets.get(previousSocketId)?.leave(payload.roomId);
+        replaceSocket(previousSocketId, payload.roomId);
       }
 
       user.socketId = socket.id;
       user.connected = true;
       user.disconnectedAt = null;
-      sessions.set(socket.id, { roomId: payload.roomId, role: 'player', pseudo: payload.pseudo });
-      socket.join(payload.roomId);
+      attachPlayerSocket(payload.roomId, payload.pseudo, socket);
       cancelReconnectTimer(payload.roomId, payload.pseudo);
       cancelRoomCleanup(payload.roomId);
 
@@ -285,27 +287,25 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
 
     socket.on('reconnectCreator', (payload: unknown, ack?: RoomAckCallback) => {
       if (!isReconnectCreatorPayload(payload)) {
-        reject(socket, 'invalidReconnect', ack);
+        rejectAck(socket, 'invalidReconnect', ack);
         return;
       }
 
       const roomData = data[payload.roomId];
-      if (!roomData || roomData.creator.creatorToken !== payload.creatorToken || isTerminalStatus(roomData.status)) {
-        reject(socket, 'invalidReconnect', ack);
+      if (!roomData || roomData.creator.creatorToken !== payload.creatorToken || isFinished(roomData.status)) {
+        rejectAck(socket, 'invalidReconnect', ack);
         return;
       }
 
       const previousSocketId = roomData.creator.socketId;
       if (previousSocketId && previousSocketId !== socket.id) {
-        sessions.delete(previousSocketId);
-        io.sockets.sockets.get(previousSocketId)?.leave(payload.roomId);
+        replaceSocket(previousSocketId, payload.roomId);
       }
 
       roomData.creator.socketId = socket.id;
       roomData.creator.connected = true;
       roomData.creator.disconnectedAt = null;
-      sessions.set(socket.id, { roomId: payload.roomId, role: 'creator' });
-      socket.join(payload.roomId);
+      attachCreatorSocket(payload.roomId, socket);
       cancelReconnectTimer(payload.roomId, 'creator');
       cancelRoomCleanup(payload.roomId);
 
@@ -333,7 +333,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       const votePayload = validateVotePayload(socket, payload, false);
       if (!votePayload) return;
 
-      const session = sessions.get(socket.id);
+      const session = getSocketSession(socket);
       if (!session) return;
 
       const roomData = data[votePayload.roomId];
@@ -385,7 +385,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
         return;
       }
 
-      removeSocketFromRoom(socket, true);
+      detachSocket(socket, true);
     });
 
     socket.on('pause', async (roomId: unknown) => {
@@ -395,15 +395,15 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       }
 
       const roomData = data[roomId];
-      if (!roomData || isTerminalStatus(roomData.status)) return;
+      if (!roomData || isFinished(roomData.status)) return;
 
-      setRoomStatus(roomData, roomData.status === 'paused' ? 'running' : 'paused');
+      setRoomStatus(roomData, isPaused(roomData.status) ? 'running' : 'paused');
       await persistRoomSession(roomId, { status: roomData.status });
       emitRoomData(roomId);
     });
 
     socket.on('disconnect', () => {
-      removeSocketFromRoom(socket, false);
+      detachSocket(socket, false);
     });
   });
 
@@ -421,16 +421,57 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     }
   }
 
-  function reject(socket: Socket, reason: string, ack?: RoomAckCallback) {
+  function attachCreatorSocket(roomId: string, socket: Socket) {
+    sessions.set(socket.id, { roomId, role: 'creator' });
+    socket.join(roomId);
+  }
+
+  function attachPlayerSocket(roomId: string, pseudo: string, socket: Socket) {
+    sessions.set(socket.id, { roomId, role: 'player', pseudo });
+    socket.join(roomId);
+  }
+
+  function isSocketAttached(socket: Socket) {
+    return sessions.has(socket.id);
+  }
+
+  function getSocketSession(socket: Socket) {
+    return sessions.get(socket.id) ?? null;
+  }
+
+  function getCreatorSession(socket: Socket, roomId: unknown): CreatorSocketSession | null {
+    if (!isValidRoomId(roomId)) return null;
+
+    const session = getSocketSession(socket);
+    return session?.role === 'creator' && session.roomId === roomId ? session : null;
+  }
+
+  function getPlayerSession(socket: Socket, roomId: unknown): PlayerSocketSession | null {
+    if (!isValidRoomId(roomId)) return null;
+
+    const session = getSocketSession(socket);
+    return session?.role === 'player' && session.roomId === roomId ? session : null;
+  }
+
+  function replaceSocket(socketId: string, roomId: string) {
+    sessions.delete(socketId);
+    io.sockets.sockets.get(socketId)?.leave(roomId);
+  }
+
+  function rejectAck(socket: Socket, reason: string, ack?: RoomAckCallback) {
     log('action_rejected', { socketId: socket.id, reason });
     ack?.({ ok: false, reason });
+  }
+
+  function reject(socket: Socket, reason: string) {
+    log('action_rejected', { socketId: socket.id, reason });
     socket.emit('actionRejected', reason);
   }
 
   function isCreatorSocket(socket: Socket, roomId: unknown): roomId is string {
     if (!isValidRoomId(roomId)) return false;
 
-    const session = sessions.get(socket.id);
+    const session = getCreatorSession(socket, roomId);
     const roomData = data[roomId];
     return Boolean(session && roomData && session.roomId === roomId && session.role === 'creator' && roomData.creator.socketId === socket.id && roomData.creator.connected);
   }
@@ -448,7 +489,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       return null;
     }
 
-    if (isTerminalStatus(roomData.status) || roomData.status === 'paused' || !roomData.currentRoundId) {
+    if (isFinished(roomData.status) || isPaused(roomData.status) || !roomData.currentRoundId) {
       reject(socket, 'voteClosed');
       return null;
     }
@@ -478,7 +519,7 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       return { ...payload, vote };
     }
 
-    const session = sessions.get(socket.id);
+    const session = getSocketSession(socket);
     if (!session || session.roomId !== payload.roomId) {
       reject(socket, 'invalidVote');
       return null;
@@ -503,12 +544,13 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       return { ...payload, vote };
     }
 
-    if (!session.pseudo) {
+    const playerSession = getPlayerSession(socket, payload.roomId);
+    if (!playerSession) {
       reject(socket, 'invalidVote');
       return null;
     }
 
-    const user = roomData.users[session.pseudo];
+    const user = roomData.users[playerSession.pseudo];
     if (!user || user.socketId !== socket.id || !user.connected) {
       reject(socket, 'invalidVote');
       return null;
@@ -527,8 +569,8 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     return { ...payload, vote };
   }
 
-  function removeSocketFromRoom(socket: Socket, explicitLeave: boolean) {
-    const session = sessions.get(socket.id);
+  function detachSocket(socket: Socket, explicitLeave: boolean) {
+    const session = getSocketSession(socket);
     if (!session) return;
 
     sessions.delete(socket.id);
@@ -684,32 +726,13 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     const roomData = data[roomId];
     if (!roomData) return;
 
-    if (roomData.images.length === 0) {
+    const result = startNextRound(roomData);
+    if (result.type === 'finished') {
       finishRoom(roomId);
       return;
     }
 
-    const randomIndex = Math.floor(Math.random() * roomData.images.length);
-    const randomImage = roomData.images[randomIndex];
-    if (!randomImage) return;
-
-    const roundId = roomData.nextRoundId;
-    roomData.nextRoundId += 1;
-    roomData.currentRoundId = roundId;
-    roomData.currentRoundStartedAt = Date.now();
-    roomData.currentImage = randomImage;
-    roomData.images = roomData.images.filter((img) => img !== randomImage);
-    setRoomStatus(roomData, 'running');
-
-    for (const user of Object.values(roomData.users)) {
-      user.vote = null;
-      user.voteRoundId = null;
-    }
-    roomData.creator.vote = null;
-    roomData.creator.voteRoundId = null;
-
-    roomData.timer = roomData.roundDuration;
-    io.in(roomId).emit('newRound', { roundId, image: randomImage });
+    io.in(roomId).emit('newRound', { roundId: result.roundId, image: result.image });
     emitRoomData(roomId);
   }
 
@@ -724,44 +747,12 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       }
 
       if (roomData.timer <= 0) {
-        const creatorVote = roomData.creator.voteRoundId === roomData.currentRoundId ? roomData.creator.vote : null;
-
-        if (creatorVote !== null && creatorVote !== undefined) {
-          const usersPoints: Record<string, number> = {};
-          const participantResults: Record<string, ParticipantRoundResult> = {};
-
-          for (const [userPseudo, user] of Object.entries(roomData.users)) {
-            const responded = user.voteRoundId === roomData.currentRoundId && user.vote !== null;
-            const effectiveVote = responded ? user.vote ?? 0 : 0;
-            const points = calculatePoints(creatorVote, effectiveVote);
-            user.lastScore = points;
-            user.allScores.push(points);
-            user.totalScore += points;
-            usersPoints[userPseudo] = points;
-            participantResults[userPseudo] = {
-              vote: responded ? user.vote : null,
-              points,
-              responded,
-              isAI: userPseudo === AI_PSEUDO,
-            };
-          }
-
-          const label = creatorVote > 0 ? 'Accepté' : 'Refusé';
-          roomData.roundHistory.push({
-            roundId: roomData.currentRoundId,
-            image: roomData.currentImage ?? '',
-            startedAt: roomData.currentRoundStartedAt ?? Date.now(),
-            endedAt: Date.now(),
-            label,
-            creatorVote,
-            participantResults,
-          });
-
+        const result = closeCurrentRound(roomData);
+        if (result.type === 'endOfRound') {
           void persistRoomSession(roomId, { status: roomData.status, roundHistory: roomData.roundHistory, finalUsers: buildFinalUsers(roomData) });
-          io.in(roomId).emit('endOfRound', { roundId: roomData.currentRoundId, pointsByPseudo: usersPoints, creatorVote });
+          io.in(roomId).emit('endOfRound', { roundId: result.roundId, pointsByPseudo: result.pointsByPseudo, creatorVote: result.creatorVote });
           startNewRound(roomId);
         } else {
-          setRoomStatus(roomData, 'waitingCreator');
           void persistRoomSession(roomId, { status: 'waitingCreator' });
           io.in(roomId).emit('waitCreator');
           emitRoomData(roomId);
@@ -919,10 +910,6 @@ function buildFinalUsers(roomData: RoomData) {
   return Object.fromEntries(Object.entries(roomData.users).map(([pseudo, user]) => [pseudo, toPublicUser(user)]));
 }
 
-function isTerminalStatus(status: string) {
-  return status === 'finished' || status === 'expired';
-}
-
 function log(event: string, details: Record<string, unknown>) {
   console.log(JSON.stringify({ event, ...details }));
 }
@@ -931,3 +918,5 @@ if (require.main === module) {
   const server = createGameServer();
   server.httpServer.listen(server.port, () => console.log(`Listening on port ${server.port.toString()}`));
 }
+
+

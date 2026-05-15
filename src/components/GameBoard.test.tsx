@@ -56,15 +56,11 @@ function createRoomData(overrides: Partial<CreatorRoomData> = {}): CreatorRoomDa
     autoRun: false,
     hasAI: false,
     status: 'running',
-    paused: false,
     refusedImages: [],
     acceptedImages: [],
-    hasStarted: true,
-    hasFinished: false,
     timer: 10,
     currentImage: null,
     currentRoundId: 1,
-    waitingForCreator: false,
     roundHistory: [],
     revealedRule: null,
     sizeLimit: 20,
@@ -100,7 +96,7 @@ beforeEach(() => {
 test('player vote emits room and vote only', () => {
   const { socket, emit, handlers } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createRoomData()} isCreator={false} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createRoomData()} role="player" callbackLeaveRoom={vi.fn()} />);
 
   act(() => {
     handlers.newRound?.({ roundId: 1, image: 'images/cards/1.png' });
@@ -118,7 +114,7 @@ test('player vote emits room and vote only', () => {
 test('creator controls pause and reveal actions', () => {
   const { socket, emit } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="" room="room1" roomData={createRoomData()} isCreator={true} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="" room="room1" roomData={createRoomData()} role="creator" callbackLeaveRoom={vi.fn()} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
   fireEvent.click(screen.getByRole('button', { name: 'Révéler la règle' }));
@@ -130,7 +126,7 @@ test('creator controls pause and reveal actions', () => {
 test('does not render end of game modal before game is finished', () => {
   const { socket } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createPublicRoomData({ hasFinished: false })} isCreator={false} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createPublicRoomData({ status: 'running' })} role="player" callbackLeaveRoom={vi.fn()} />);
 
   expect(screen.queryByTestId('end-of-game-modal')).not.toBeInTheDocument();
 });
@@ -138,7 +134,7 @@ test('does not render end of game modal before game is finished', () => {
 test('renders end of game modal when game is finished', async () => {
   const { socket } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createPublicRoomData({ hasFinished: true, revealedRule: 'Accept red cards' })} isCreator={false} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createPublicRoomData({ status: 'finished', revealedRule: 'Accept red cards' })} role="player" callbackLeaveRoom={vi.fn()} />);
 
   expect(await screen.findByTestId('end-of-game-modal')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Room room1' })).toBeInTheDocument();
@@ -147,7 +143,7 @@ test('renders end of game modal when game is finished', async () => {
 test('does not initialize AI model when room has no AI', () => {
   const { socket } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="" room="room1" roomData={createRoomData({ hasAI: false })} isCreator={true} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="" room="room1" roomData={createRoomData({ hasAI: false })} role="creator" callbackLeaveRoom={vi.fn()} />);
 
   expect(aiModelMock.loadFeatureExtractor).not.toHaveBeenCalled();
   expect(aiModelMock.loadModel).not.toHaveBeenCalled();
@@ -156,7 +152,7 @@ test('does not initialize AI model when room has no AI', () => {
 test('creator initializes AI model when room has AI', async () => {
   const { socket } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="" room="room1" roomData={createRoomData({ hasAI: true })} isCreator={true} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="" room="room1" roomData={createRoomData({ hasAI: true })} role="creator" callbackLeaveRoom={vi.fn()} />);
 
   await waitFor(() => expect(aiModelMock.loadFeatureExtractor).toHaveBeenCalledTimes(1));
 
@@ -168,7 +164,7 @@ test('AI initialization failure keeps the board rendered', async () => {
   aiModelMock.loadFeatureExtractor.mockRejectedValueOnce(new Error('model unavailable'));
   const { socket } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="" room="room1" roomData={createRoomData({ hasAI: true })} isCreator={true} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="" room="room1" roomData={createRoomData({ hasAI: true })} role="creator" callbackLeaveRoom={vi.fn()} />);
 
   await waitFor(() => expect(consoleError).toHaveBeenCalledWith('Error initializing model:', expect.any(Error)));
 
@@ -180,7 +176,7 @@ test('AI initialization failure keeps the board rendered', async () => {
 test('player room data does not expose the secret rule before the end', () => {
   const { socket } = createSocketMock();
 
-  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createPublicRoomData({ hasFinished: false, revealedRule: null })} isCreator={false} callbackLeaveRoom={vi.fn()} />);
+  render(<GameBoard socket={socket} pseudo="Alice" room="room1" roomData={createPublicRoomData({ status: 'running', revealedRule: null })} role="player" callbackLeaveRoom={vi.fn()} />);
 
   expect(screen.queryByText(/Accept red cards/)).not.toBeInTheDocument();
 });

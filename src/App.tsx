@@ -22,6 +22,8 @@ type StoredSession =
       creatorToken: string;
     };
 
+type RoomRole = 'creator' | 'player';
+
 interface LegacyStoredSession {
   roomId: string;
   pseudo: string;
@@ -57,7 +59,7 @@ function clearStoredSession() {
 function App() {
   const [isInGame, setIsInGame] = useState(false)
   const [pseudo, setPseudo] = useState('')
-  const [isCreator, setIsCreator] = useState(false)
+  const [role, setRole] = useState<RoomRole>('player')
   const [room, setRoom] = useState('')
   const [roomData, setRoomData] = useState<ClientRoomData | null>(null)
   const [connectionError, setConnectionError] = useState(false)
@@ -78,7 +80,7 @@ function App() {
           if (ack.ok && ack.role === 'creator') {
             setPseudo('');
             setRoom(ack.roomId);
-            setIsCreator(true);
+            setRole('creator');
             setIsInGame(true);
             saveStoredSession({ role: 'creator', roomId: ack.roomId, creatorToken: ack.creatorToken });
             return;
@@ -87,7 +89,7 @@ function App() {
           clearStoredSession();
           setRoom('');
           setPseudo('');
-          setIsCreator(false);
+          setRole('player');
           setIsInGame(false);
           setRoomData(null);
         });
@@ -104,7 +106,7 @@ function App() {
         if (ack.ok && ack.role === 'player') {
           setPseudo(ack.pseudo);
           setRoom(ack.roomId);
-          setIsCreator(false);
+          setRole('player');
           setIsInGame(true);
           saveStoredSession({ role: 'player', roomId: ack.roomId, pseudo: ack.pseudo, participantToken: ack.participantToken });
           return;
@@ -113,7 +115,7 @@ function App() {
         clearStoredSession();
         setRoom('');
         setPseudo('');
-        setIsCreator(false);
+        setRole('player');
         setIsInGame(false);
         setRoomData(null);
       });
@@ -136,14 +138,21 @@ function App() {
       setRoomData(roomData)
     };
 
+    const onActionRejected = (reason: string) => {
+      console.warn('Action rejected by server:', reason);
+      alert('Action refusée par le serveur.');
+    };
+
     socket.on('connect', onConnect);
     socket.on('connect_error', onConnectError);
     socket.on('updateRoomData', onUpdateRoomData);
+    socket.on('actionRejected', onActionRejected);
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('connect_error', onConnectError);
       socket.off('updateRoomData', onUpdateRoomData);
+      socket.off('actionRejected', onActionRejected);
     };
   },[])
 
@@ -154,26 +163,24 @@ function App() {
       .catch(() => setTeacher(null));
   }, []);
 
-  const callbackPseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {setPseudo(e.target.value)}
-  const callbackRoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {setRoom(e.target.value)}
-  const callbackJoinRoom = (room: string, nextPseudo: string, participantToken: string) => {
-    setRoom(room)
+  const onPlayerJoined = ({ roomId, pseudo: nextPseudo, participantToken }: { roomId: string; pseudo: string; participantToken: string }) => {
+    setRoom(roomId)
     setPseudo(nextPseudo)
-    setIsCreator(false)
+    setRole('player')
     setIsInGame(true)
-    saveStoredSession({ role: 'player', roomId: room, pseudo: nextPseudo, participantToken })
+    saveStoredSession({ role: 'player', roomId, pseudo: nextPseudo, participantToken })
   }
-  const callbackCreateRoom = (room: string, creatorToken: string) => {
-    setRoom(room)
+  const onCreatorJoined = ({ roomId, creatorToken }: { roomId: string; creatorToken: string }) => {
+    setRoom(roomId)
     setPseudo('')
-    setIsCreator(true)
+    setRole('creator')
     setIsInGame(true)
-    saveStoredSession({ role: 'creator', roomId: room, creatorToken })
+    saveStoredSession({ role: 'creator', roomId, creatorToken })
   }
   const callbackLeaveRoom = () => {
     setRoom('')
     setPseudo('')
-    setIsCreator(false)
+    setRole('player')
     setIsInGame(false)
     setRoomData(null)
     clearStoredSession()
@@ -182,8 +189,8 @@ function App() {
   return (
     <Box sx={{ p: 2 }}>
       {isInGame && roomData
-        ? <GameBoard socket={socket} pseudo={pseudo} room={room} roomData={roomData} isCreator={isCreator} callbackLeaveRoom={callbackLeaveRoom} />
-        : <Home socket={socket} teacher={teacher} callbackPseudoChange={callbackPseudoChange} callbackRoomChange={callbackRoomChange} callbackJoinRoom={callbackJoinRoom} callbackCreateRoom={callbackCreateRoom} />
+        ? <GameBoard socket={socket} pseudo={pseudo} room={room} roomData={roomData} role={role} callbackLeaveRoom={callbackLeaveRoom} />
+        : <Home socket={socket} teacher={teacher} onPlayerJoined={onPlayerJoined} onCreatorJoined={onCreatorJoined} />
       }
       <TeacherAuthButton teacher={teacher} onTeacherChange={setTeacher} />
       <Snackbar open={connectionError} autoHideDuration={6000} onClose={() => setConnectionError(false)}>

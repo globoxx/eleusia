@@ -1,4 +1,5 @@
 import type { ImageCatalog } from '../shared/types';
+import { isFinished, isLobby, isPaused, isRunning, isWaitingCreator } from '../shared/roomStatus';
 import {
   AI_PSEUDO,
   buildCreatorRoomData,
@@ -101,27 +102,26 @@ test('builds public and creator room payloads without leaking private state', ()
   expect(creatorRoom.refusedImages).toEqual(validInput.refusedImages);
 });
 
-test('derives legacy payload flags from room status', () => {
+test('uses room status as the single source of truth', () => {
   const room = createRoomData(validInput, 'socket-1', catalog, 'token-1');
   expect(room.status).toBe('lobby');
+  expect(isLobby(room.status)).toBe(true);
 
   setRoomStatus(room, 'running');
-  expect(buildPublicRoomData(room)).toMatchObject({
-    status: 'running',
-    hasStarted: true,
-    hasFinished: false,
-    paused: false,
-    waitingForCreator: false,
-  });
+  expect(isRunning(room.status)).toBe(true);
+  expect(buildPublicRoomData(room)).toMatchObject({ status: 'running' });
 
   setRoomStatus(room, 'paused');
-  expect(buildPublicRoomData(room)).toMatchObject({ status: 'paused', paused: true });
+  expect(isPaused(room.status)).toBe(true);
+  expect(buildPublicRoomData(room)).toMatchObject({ status: 'paused' });
 
   setRoomStatus(room, 'waitingCreator');
-  expect(buildPublicRoomData(room)).toMatchObject({ status: 'waitingCreator', waitingForCreator: true });
+  expect(isWaitingCreator(room.status)).toBe(true);
+  expect(buildPublicRoomData(room)).toMatchObject({ status: 'waitingCreator' });
 
   setRoomStatus(room, 'finished');
-  expect(buildPublicRoomData(room)).toMatchObject({ status: 'finished', hasFinished: true, revealedRule: validInput.rule });
+  expect(isFinished(room.status)).toBe(true);
+  expect(buildPublicRoomData(room)).toMatchObject({ status: 'finished', revealedRule: validInput.rule });
 });
 
 test('normalizes votes and preserves the bounded current scoring rule', () => {

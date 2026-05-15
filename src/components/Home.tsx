@@ -21,7 +21,7 @@ import {
   Typography,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import type { CreateRoomPayload, ImageCatalog, JoinRoomPayload, RoomAck, RoomSessionRecord, RoomTemplatePayload, RoomTemplateRecord, TeacherPublic } from '../shared/types';
 import HelpTooltip from './HelpTooltip';
@@ -31,13 +31,11 @@ import TransferImage from './TransferImage';
 type HomeProps = {
   socket: Socket;
   teacher: TeacherPublic | null;
-  callbackPseudoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  callbackRoomChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  callbackJoinRoom: (room: string, pseudo: string, participantToken: string) => void;
-  callbackCreateRoom: (room: string, creatorToken: string) => void;
+  onPlayerJoined: (session: { roomId: string; pseudo: string; participantToken: string }) => void;
+  onCreatorJoined: (session: { roomId: string; creatorToken: string }) => void;
 };
 
-function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callbackJoinRoom, callbackCreateRoom }: HomeProps) {
+function Home({ socket, teacher, onPlayerJoined, onCreatorJoined }: HomeProps) {
   const [pseudo, setPseudo] = useState('');
   const [room, setRoom] = useState('');
 
@@ -70,12 +68,10 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
     labelsAreComplete;
 
   const handlePseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    callbackPseudoChange(e);
     setPseudo(e.target.value);
   };
 
   const handleRoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    callbackRoomChange(e);
     setRoom(e.target.value);
   };
 
@@ -89,7 +85,7 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
       const payload: JoinRoomPayload = { roomId: room, pseudo };
       socket.emit('joinRoom', payload, (ack: RoomAck) => {
         if (ack.ok && ack.role === 'player') {
-          callbackJoinRoom(ack.roomId, ack.pseudo, ack.participantToken);
+          onPlayerJoined({ roomId: ack.roomId, pseudo: ack.pseudo, participantToken: ack.participantToken });
           return;
         }
 
@@ -117,7 +113,7 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
 
     socket.emit('createRoom', payload, (ack: RoomAck) => {
       if (ack.ok && ack.role === 'creator') {
-        callbackCreateRoom(ack.roomId, ack.creatorToken);
+        onCreatorJoined({ roomId: ack.roomId, creatorToken: ack.creatorToken });
         return;
       }
 
@@ -146,23 +142,11 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
 
   useEffect(() => {
     const onUpdateImages = (updatedImages: ImageCatalog) => setAllImages(updatedImages);
-    const onRoomAlreadyExists = () => alert('Ce numéro de room existe déjà.');
-    const onPseudoAlreadyExists = () => alert('Ce pseudo existe déjà dans cette room.');
-    const onRoomFull = () => alert('Cette room est déjà pleine.');
-    const onActionRejected = () => alert('Action refusée par le serveur.');
 
     socket.on('updateImages', onUpdateImages);
-    socket.on('roomAlreadyExists', onRoomAlreadyExists);
-    socket.on('pseudoAlreadyExists', onPseudoAlreadyExists);
-    socket.on('roomFull', onRoomFull);
-    socket.on('actionRejected', onActionRejected);
 
     return () => {
       socket.off('updateImages', onUpdateImages);
-      socket.off('roomAlreadyExists', onRoomAlreadyExists);
-      socket.off('pseudoAlreadyExists', onPseudoAlreadyExists);
-      socket.off('roomFull', onRoomFull);
-      socket.off('actionRejected', onActionRejected);
     };
   }, [socket]);
 
@@ -214,7 +198,7 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
 
     socket.emit('launchRoomTemplate', { templateId, roomId }, (ack: RoomAck) => {
       if (ack.ok && ack.role === 'creator') {
-        callbackCreateRoom(ack.roomId, ack.creatorToken);
+        onCreatorJoined({ roomId: ack.roomId, creatorToken: ack.creatorToken });
         void refreshTeacherData();
         return;
       }

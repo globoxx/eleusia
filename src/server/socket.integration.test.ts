@@ -66,6 +66,18 @@ test('does not publish open room codes on connection and joins by direct code', 
   expect(missingAck).toEqual({ ok: false, reason: 'roomNotFound' });
 });
 
+test('acked handlers reject only through acknowledgements', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const player = await connectClient(url);
+
+  const rejectedEventPromise = onceWithTimeout<string>(player, 'actionRejected', 30);
+  const missingAck = await emitWithAck<RoomAck>(player, 'joinRoom', { roomId: 'missing', pseudo: 'Alice' });
+
+  expect(missingAck).toEqual({ ok: false, reason: 'roomNotFound' });
+  await expect(rejectedEventPromise).resolves.toBeNull();
+});
+
 test('reconnects a disconnected player with a valid session token', async () => {
   const { server, url } = await startTestServer();
   createdServers.push(server);
@@ -161,11 +173,11 @@ test('expires the creator after the reconnection grace period and reveals the ru
   await emitWithAck<RoomAck>(creator, 'createRoom', createPayload());
   await emitWithAck<RoomAck>(player, 'joinRoom', { roomId: 'room1', pseudo: 'Alice' });
 
-  const finishedPromise = waitForRoomData(player, (roomData) => roomData.hasFinished);
+  const finishedPromise = waitForRoomData(player, (roomData) => roomData.status === 'expired' || roomData.status === 'finished');
   creator.close();
   const finishedRoom = await finishedPromise;
 
-  expect(finishedRoom.hasFinished).toBe(true);
+  expect(['finished', 'expired']).toContain(finishedRoom.status);
   expect(finishedRoom.revealedRule).toBe('Accept red cards');
 });
 
@@ -203,7 +215,7 @@ test('allows the creator to start alone and exposes status transitions', async (
   const pausedPromise = waitForRoomData(creator, (roomData) => roomData.status === 'paused');
   creator.emit('pause', 'room1');
   const pausedRoom = await pausedPromise;
-  expect(pausedRoom.paused).toBe(true);
+  expect(pausedRoom.status).toBe('paused');
 });
 
 test('waits for the creator once and records complete round history including non-responses and AI', async () => {

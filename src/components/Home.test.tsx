@@ -28,17 +28,15 @@ function createSocketMock(ack: RoomAck) {
 
 test('joins by direct room code without needing a published room list', () => {
   const { socket, emit } = createSocketMock({ ok: true, role: 'player', roomId: 'room1', pseudo: 'Alice', participantToken: 'token-1' });
-  const callbackJoinRoom = vi.fn();
-  const callbackCreateRoom = vi.fn();
+  const onPlayerJoined = vi.fn();
+  const onCreatorJoined = vi.fn();
 
   const { container } = render(
     <Home
       socket={socket}
       teacher={null}
-      callbackPseudoChange={vi.fn()}
-      callbackRoomChange={vi.fn()}
-      callbackJoinRoom={callbackJoinRoom}
-      callbackCreateRoom={callbackCreateRoom}
+      onPlayerJoined={onPlayerJoined}
+      onCreatorJoined={onCreatorJoined}
     />,
   );
 
@@ -49,23 +47,32 @@ test('joins by direct room code without needing a published room list', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Rejoindre la room !' }));
 
   expect(emit).toHaveBeenCalledWith('joinRoom', { roomId: 'room1', pseudo: 'Alice' }, expect.any(Function));
-  expect(callbackJoinRoom).toHaveBeenCalledWith('room1', 'Alice', 'token-1');
+  expect(onPlayerJoined).toHaveBeenCalledWith({ roomId: 'room1', pseudo: 'Alice', participantToken: 'token-1' });
+});
+
+test('does not subscribe to legacy room rejection events', () => {
+  const { socket } = createSocketMock({ ok: false, reason: 'roomNotFound' });
+
+  render(<Home socket={socket} teacher={null} onPlayerJoined={vi.fn()} onCreatorJoined={vi.fn()} />);
+
+  expect(socket.on).not.toHaveBeenCalledWith('roomAlreadyExists', expect.any(Function));
+  expect(socket.on).not.toHaveBeenCalledWith('pseudoAlreadyExists', expect.any(Function));
+  expect(socket.on).not.toHaveBeenCalledWith('roomFull', expect.any(Function));
+  expect(socket.on).not.toHaveBeenCalledWith('actionRejected', expect.any(Function));
 });
 
 test('shows the ack error and does not enter a missing room', () => {
   const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
   const { socket } = createSocketMock({ ok: false, reason: 'roomNotFound' });
-  const callbackJoinRoom = vi.fn();
-  const callbackCreateRoom = vi.fn();
+  const onPlayerJoined = vi.fn();
+  const onCreatorJoined = vi.fn();
 
   const { container } = render(
     <Home
       socket={socket}
       teacher={null}
-      callbackPseudoChange={vi.fn()}
-      callbackRoomChange={vi.fn()}
-      callbackJoinRoom={callbackJoinRoom}
-      callbackCreateRoom={callbackCreateRoom}
+      onPlayerJoined={onPlayerJoined}
+      onCreatorJoined={onCreatorJoined}
     />,
   );
 
@@ -75,7 +82,7 @@ test('shows the ack error and does not enter a missing room', () => {
   fireEvent.change(container.querySelectorAll('input')[1], { target: { value: 'missing' } });
   fireEvent.click(screen.getByRole('button', { name: 'Rejoindre la room !' }));
 
-  expect(callbackJoinRoom).not.toHaveBeenCalled();
+  expect(onPlayerJoined).not.toHaveBeenCalled();
   expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("Cette room n'existe pas"));
   alertSpy.mockRestore();
 });
