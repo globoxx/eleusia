@@ -23,7 +23,7 @@ type EndOfGameModalProps = {
   rule: string;
   open: boolean;
   pseudo: string;
-  creatorPseudo: string;
+  isCreator: boolean;
   roundHistory: RoundHistoryItem[];
 };
 
@@ -43,7 +43,7 @@ function buildScores(roundHistory: RoundHistoryItem[]) {
   );
 }
 
-function EndOfGameModal({ rule, open, pseudo, creatorPseudo, roundHistory }: EndOfGameModalProps) {
+function EndOfGameModal({ rule, open, pseudo, isCreator, roundHistory }: EndOfGameModalProps) {
   const scores = buildScores(roundHistory);
   const images = roundHistory.map((round) => round.image);
   const labels = roundHistory.map((round) => round.label);
@@ -75,7 +75,7 @@ function EndOfGameModal({ rule, open, pseudo, creatorPseudo, roundHistory }: End
           </Typography>
 
           <div>
-            {scoresReadyToShow ? <ScoreChart scores={scores} pseudo={pseudo} isCreator={pseudo === creatorPseudo} allImages={images} allLabels={labels} /> : null}
+            {scoresReadyToShow ? <ScoreChart scores={scores} pseudo={pseudo} isCreator={isCreator} allImages={images} allLabels={labels} /> : null}
           </div>
         </Box>
       </Fade>

@@ -27,8 +27,9 @@ function createSocketMock(ack: RoomAck) {
 }
 
 test('joins by direct room code without needing a published room list', () => {
-  const { socket, emit } = createSocketMock({ ok: true, roomId: 'room1', pseudo: 'Alice', participantToken: 'token-1' });
+  const { socket, emit } = createSocketMock({ ok: true, role: 'player', roomId: 'room1', pseudo: 'Alice', participantToken: 'token-1' });
   const callbackJoinRoom = vi.fn();
+  const callbackCreateRoom = vi.fn();
 
   const { container } = render(
     <Home
@@ -37,12 +38,13 @@ test('joins by direct room code without needing a published room list', () => {
       callbackPseudoChange={vi.fn()}
       callbackRoomChange={vi.fn()}
       callbackJoinRoom={callbackJoinRoom}
+      callbackCreateRoom={callbackCreateRoom}
     />,
   );
 
+  fireEvent.click(screen.getByRole('button', { name: 'Rejoindre une room' }));
   const inputs = container.querySelectorAll('input');
   fireEvent.change(inputs[0], { target: { value: 'Alice' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Rejoindre une room' }));
   fireEvent.change(container.querySelectorAll('input')[1], { target: { value: 'room1' } });
   fireEvent.click(screen.getByRole('button', { name: 'Rejoindre la room !' }));
 
@@ -54,6 +56,7 @@ test('shows the ack error and does not enter a missing room', () => {
   const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
   const { socket } = createSocketMock({ ok: false, reason: 'roomNotFound' });
   const callbackJoinRoom = vi.fn();
+  const callbackCreateRoom = vi.fn();
 
   const { container } = render(
     <Home
@@ -62,12 +65,13 @@ test('shows the ack error and does not enter a missing room', () => {
       callbackPseudoChange={vi.fn()}
       callbackRoomChange={vi.fn()}
       callbackJoinRoom={callbackJoinRoom}
+      callbackCreateRoom={callbackCreateRoom}
     />,
   );
 
+  fireEvent.click(screen.getByRole('button', { name: 'Rejoindre une room' }));
   const inputs = container.querySelectorAll('input');
   fireEvent.change(inputs[0], { target: { value: 'Alice' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Rejoindre une room' }));
   fireEvent.change(container.querySelectorAll('input')[1], { target: { value: 'missing' } });
   fireEvent.click(screen.getByRole('button', { name: 'Rejoindre la room !' }));
 

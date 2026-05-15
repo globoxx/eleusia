@@ -34,9 +34,10 @@ type HomeProps = {
   callbackPseudoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   callbackRoomChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   callbackJoinRoom: (room: string, pseudo: string, participantToken: string) => void;
+  callbackCreateRoom: (room: string, creatorToken: string) => void;
 };
 
-function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callbackJoinRoom }: HomeProps) {
+function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callbackJoinRoom, callbackCreateRoom }: HomeProps) {
   const [pseudo, setPseudo] = useState('');
   const [room, setRoom] = useState('');
 
@@ -62,8 +63,6 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
   const missingLabelsCount = Math.max(0, selectedImages.length - labeledImagesCount);
   const labelsAreComplete = !labelsSwitchChecked || (selectedImages.length > 0 && labeledImagesCount === selectedImages.length);
   const roomFormIsValid =
-    pseudo.length > 0 &&
-    pseudo.length <= 15 &&
     newRoom.length > 0 &&
     newRoomImageSet.length > 0 &&
     newRoomRoundDuration.length > 0 &&
@@ -89,12 +88,12 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
     if (pseudo && room) {
       const payload: JoinRoomPayload = { roomId: room, pseudo };
       socket.emit('joinRoom', payload, (ack: RoomAck) => {
-        if (ack.ok) {
+        if (ack.ok && ack.role === 'player') {
           callbackJoinRoom(ack.roomId, ack.pseudo, ack.participantToken);
           return;
         }
 
-        alert(getRejectionMessage(ack.reason));
+        if (!ack.ok) alert(getRejectionMessage(ack.reason));
       });
       return;
     }
@@ -105,7 +104,6 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
   const handleClickCreateRoom = () => {
     const sizeLimit = newRoomSizeLimitChecked && newRoomSizeLimit.length > 0 ? parseInt(newRoomSizeLimit, 10) : 1000;
     const payload: CreateRoomPayload = {
-      pseudo,
       roomId: newRoom,
       roundDuration: parseInt(newRoomRoundDuration, 10),
       imageSet: newRoomImageSet,
@@ -118,12 +116,12 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
     };
 
     socket.emit('createRoom', payload, (ack: RoomAck) => {
-      if (ack.ok) {
-        callbackJoinRoom(ack.roomId, ack.pseudo, ack.participantToken);
+      if (ack.ok && ack.role === 'creator') {
+        callbackCreateRoom(ack.roomId, ack.creatorToken);
         return;
       }
 
-      alert(getRejectionMessage(ack.reason));
+      if (!ack.ok) alert(getRejectionMessage(ack.reason));
     });
   };
 
@@ -211,22 +209,17 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
   });
 
   const launchTemplate = (templateId: string, defaultRoomId = '') => {
-    if (!pseudo) {
-      alert('Choisissez un pseudo avant de lancer une room.');
-      return;
-    }
-
     const roomId = window.prompt('Code de room à communiquer aux élèves', defaultRoomId);
     if (!roomId) return;
 
-    socket.emit('launchRoomTemplate', { templateId, roomId, pseudo }, (ack: RoomAck) => {
-      if (ack.ok) {
-        callbackJoinRoom(ack.roomId, ack.pseudo, ack.participantToken);
+    socket.emit('launchRoomTemplate', { templateId, roomId }, (ack: RoomAck) => {
+      if (ack.ok && ack.role === 'creator') {
+        callbackCreateRoom(ack.roomId, ack.creatorToken);
         void refreshTeacherData();
         return;
       }
 
-      alert(getRejectionMessage(ack.reason));
+      if (!ack.ok) alert(getRejectionMessage(ack.reason));
     });
   };
 
@@ -272,9 +265,6 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
           <Typography variant="h3">ELEUS-IA</Typography>
           <Typography variant="h5">Dans la peau d'une intelligence artificielle</Typography>
         </Grid>
-        <Grid size={12} sx={{ textAlign: 'center' }}>
-          <TextField required label="Pseudo" slotProps={{ htmlInput: { maxLength: 15 } }} value={pseudo} onChange={handlePseudoChange} variant="outlined" />
-        </Grid>
         <Grid size={6}>
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreOutlined />} sx={{ backgroundColor: 'lightblue' }}>
@@ -285,6 +275,7 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
             </AccordionSummary>
             <AccordionDetails>
               <Stack spacing={2}>
+                <TextField required label="Pseudo" slotProps={{ htmlInput: { maxLength: 15 } }} value={pseudo} onChange={handlePseudoChange} variant="outlined" />
                 <TextField label="Room code" value={room} onChange={handleRoomChange} variant="outlined" />
                 <Button variant="contained" disabled={pseudo.length === 0 || pseudo.length > 15 || room.length === 0} onClick={handleClickJoinRoom}>
                   Rejoindre la room !
@@ -414,7 +405,7 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
                           </Typography>
                         </Box>
                         <Stack direction="row" spacing={1}>
-                          <Button variant="contained" size="small" disabled={!pseudo || pseudo.length > 15} onClick={() => launchTemplate(template.id, template.name)}>
+                          <Button variant="contained" size="small" onClick={() => launchTemplate(template.id, template.name)}>
                             Lancer
                           </Button>
                           <Button variant="outlined" color="error" size="small" onClick={() => void archiveTemplate(template.id)}>

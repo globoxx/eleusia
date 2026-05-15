@@ -195,7 +195,7 @@ function readTemplatePayload(body: unknown, allImages: ImageCatalog): { ok: true
     acceptedImages: input.autoRun ? input.acceptedImages.filter((image): image is string => typeof image === 'string') : [],
   };
 
-  const validation = validateCreateRoomInput({ ...value, pseudo: 'Teacher', roomId: 'template' }, allImages);
+  const validation = validateCreateRoomInput({ ...value, roomId: 'template' }, allImages);
   if (!validation.ok) return validation;
   return { ok: true, value };
 }

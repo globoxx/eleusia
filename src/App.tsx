@@ -3,13 +3,26 @@ import { io, Socket } from "socket.io-client";
 import GameBoard from './components/GameBoard';
 import Home from './components/Home'
 import TeacherAuthButton from './components/TeacherAuthButton';
-import type { AuthResponse, ClientRoomData, ReconnectRoomPayload, RoomAck, TeacherPublic } from './shared/types';
+import type { AuthResponse, ClientRoomData, ReconnectCreatorPayload, ReconnectRoomPayload, RoomAck, TeacherPublic } from './shared/types';
 import { Alert, Box, Snackbar } from '@mui/material';
 
 const socket: Socket = io()
 const sessionStorageKey = 'eleusia.session';
 
-interface StoredSession {
+type StoredSession =
+  | {
+      role: 'player';
+      roomId: string;
+      pseudo: string;
+      participantToken: string;
+    }
+  | {
+      role: 'creator';
+      roomId: string;
+      creatorToken: string;
+    };
+
+interface LegacyStoredSession {
   roomId: string;
   pseudo: string;
   participantToken: string;
@@ -19,9 +32,12 @@ function readStoredSession(): StoredSession | null {
   try {
     const raw = sessionStorage.getItem(sessionStorageKey);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<StoredSession>;
-    if (typeof parsed.roomId === 'string' && typeof parsed.pseudo === 'string' && typeof parsed.participantToken === 'string') {
+    const parsed = JSON.parse(raw) as Partial<StoredSession & LegacyStoredSession>;
+    if (parsed.role === 'creator' && typeof parsed.roomId === 'string' && typeof parsed.creatorToken === 'string') {
       return parsed as StoredSession;
+    }
+    if ((parsed.role === 'player' || !parsed.role) && typeof parsed.roomId === 'string' && typeof parsed.pseudo === 'string' && typeof parsed.participantToken === 'string') {
+      return { role: 'player', roomId: parsed.roomId, pseudo: parsed.pseudo, participantToken: parsed.participantToken };
     }
   } catch (error) {
     sessionStorage.removeItem(sessionStorageKey);
@@ -41,6 +57,7 @@ function clearStoredSession() {
 function App() {
   const [isInGame, setIsInGame] = useState(false)
   const [pseudo, setPseudo] = useState('')
+  const [isCreator, setIsCreator] = useState(false)
   const [room, setRoom] = useState('')
   const [roomData, setRoomData] = useState<ClientRoomData | null>(null)
   const [connectionError, setConnectionError] = useState(false)
@@ -51,6 +68,32 @@ function App() {
       const storedSession = readStoredSession();
       if (!storedSession) return;
 
+      if (storedSession.role === 'creator') {
+        const payload: ReconnectCreatorPayload = {
+          roomId: storedSession.roomId,
+          creatorToken: storedSession.creatorToken,
+        };
+
+        socket.emit('reconnectCreator', payload, (ack: RoomAck) => {
+          if (ack.ok && ack.role === 'creator') {
+            setPseudo('');
+            setRoom(ack.roomId);
+            setIsCreator(true);
+            setIsInGame(true);
+            saveStoredSession({ role: 'creator', roomId: ack.roomId, creatorToken: ack.creatorToken });
+            return;
+          }
+
+          clearStoredSession();
+          setRoom('');
+          setPseudo('');
+          setIsCreator(false);
+          setIsInGame(false);
+          setRoomData(null);
+        });
+        return;
+      }
+
       const payload: ReconnectRoomPayload = {
         roomId: storedSession.roomId,
         pseudo: storedSession.pseudo,
@@ -58,17 +101,19 @@ function App() {
       };
 
       socket.emit('reconnectRoom', payload, (ack: RoomAck) => {
-        if (ack.ok) {
+        if (ack.ok && ack.role === 'player') {
           setPseudo(ack.pseudo);
           setRoom(ack.roomId);
+          setIsCreator(false);
           setIsInGame(true);
-          saveStoredSession(ack);
+          saveStoredSession({ role: 'player', roomId: ack.roomId, pseudo: ack.pseudo, participantToken: ack.participantToken });
           return;
         }
 
         clearStoredSession();
         setRoom('');
         setPseudo('');
+        setIsCreator(false);
         setIsInGame(false);
         setRoomData(null);
       });
@@ -114,11 +159,21 @@ function App() {
   const callbackJoinRoom = (room: string, nextPseudo: string, participantToken: string) => {
     setRoom(room)
     setPseudo(nextPseudo)
+    setIsCreator(false)
     setIsInGame(true)
-    saveStoredSession({ roomId: room, pseudo: nextPseudo, participantToken })
+    saveStoredSession({ role: 'player', roomId: room, pseudo: nextPseudo, participantToken })
+  }
+  const callbackCreateRoom = (room: string, creatorToken: string) => {
+    setRoom(room)
+    setPseudo('')
+    setIsCreator(true)
+    setIsInGame(true)
+    saveStoredSession({ role: 'creator', roomId: room, creatorToken })
   }
   const callbackLeaveRoom = () => {
     setRoom('')
+    setPseudo('')
+    setIsCreator(false)
     setIsInGame(false)
     setRoomData(null)
     clearStoredSession()
@@ -127,8 +182,8 @@ function App() {
   return (
     <Box sx={{ p: 2 }}>
       {isInGame && roomData
-        ? <GameBoard socket={socket} pseudo={pseudo} room={room} roomData={roomData} callbackLeaveRoom={callbackLeaveRoom} />
-        : <Home socket={socket} teacher={teacher} callbackPseudoChange={callbackPseudoChange} callbackRoomChange={callbackRoomChange} callbackJoinRoom={callbackJoinRoom} />
+        ? <GameBoard socket={socket} pseudo={pseudo} room={room} roomData={roomData} isCreator={isCreator} callbackLeaveRoom={callbackLeaveRoom} />
+        : <Home socket={socket} teacher={teacher} callbackPseudoChange={callbackPseudoChange} callbackRoomChange={callbackRoomChange} callbackJoinRoom={callbackJoinRoom} callbackCreateRoom={callbackCreateRoom} />
       }
       <TeacherAuthButton teacher={teacher} onTeacherChange={setTeacher} />
       <Snackbar open={connectionError} autoHideDuration={6000} onClose={() => setConnectionError(false)}>

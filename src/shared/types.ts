@@ -14,6 +14,15 @@ export interface Users {
   [pseudo: string]: User;
 }
 
+export interface CreatorState {
+  socketId: string;
+  creatorToken: string;
+  connected: boolean;
+  disconnectedAt: number | null;
+  vote: number | null;
+  voteRoundId: number | null;
+}
+
 export type RoomStatus = 'lobby' | 'running' | 'paused' | 'waitingCreator' | 'finished' | 'expired';
 export type RoundLabel = 'Accepté' | 'Refusé';
 
@@ -37,7 +46,7 @@ export interface RoundHistoryItem {
 export interface RoomData {
   rule: string;
   roundDuration: number;
-  creator: string;
+  creator: CreatorState;
   autoRun: boolean;
   hasAI: boolean;
   status: RoomStatus;
@@ -83,7 +92,7 @@ export interface PublicUsers {
 export interface PublicRoomData {
   status: RoomStatus;
   roundDuration: number;
-  creator: string;
+  creatorConnected: boolean;
   autoRun: boolean;
   hasAI: boolean;
   paused: boolean;
@@ -107,11 +116,19 @@ export interface CreatorRoomData extends PublicRoomData {
 
 export type ClientRoomData = PublicRoomData | CreatorRoomData;
 
-export interface RoomAckSuccess {
+export interface PlayerRoomAckSuccess {
   ok: true;
+  role: 'player';
   roomId: string;
   pseudo: string;
   participantToken: string;
+}
+
+export interface CreatorRoomAckSuccess {
+  ok: true;
+  role: 'creator';
+  roomId: string;
+  creatorToken: string;
   templateId?: string;
   sessionId?: string;
 }
@@ -121,10 +138,9 @@ export interface RoomAckFailure {
   reason: string;
 }
 
-export type RoomAck = RoomAckSuccess | RoomAckFailure;
+export type RoomAck = PlayerRoomAckSuccess | CreatorRoomAckSuccess | RoomAckFailure;
 
 export interface CreateRoomPayload {
-  pseudo: string;
   roomId: string;
   roundDuration: number;
   imageSet: string;
@@ -145,6 +161,11 @@ export interface ReconnectRoomPayload {
   roomId: string;
   pseudo: string;
   participantToken: string;
+}
+
+export interface ReconnectCreatorPayload {
+  roomId: string;
+  creatorToken: string;
 }
 
 export interface VotePayload {
@@ -205,5 +226,4 @@ export interface RoomSessionRecord {
 export interface LaunchRoomTemplatePayload {
   templateId: string;
   roomId: string;
-  pseudo: string;
 }

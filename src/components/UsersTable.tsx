@@ -22,7 +22,6 @@ function UsersTable({roomData, pseudo}: {roomData: ClientRoomData, pseudo: strin
                 </TableHead>
                 <TableBody>
                 {Object.entries(roomData.users).sort(([, userA], [, userB]) => userB.totalScore - userA.totalScore).map(([linePseudo, user]: [string, PublicUser]) => (
-                    (linePseudo !== roomData.creator) && (
                         <TableRow
                             key={linePseudo}
                             sx={{ '&:last-child td, &:last-child th': { border: 0 }, backgroundColor: pseudo === linePseudo ? '#e0e0e0' : undefined }}
@@ -31,13 +30,12 @@ function UsersTable({roomData, pseudo}: {roomData: ClientRoomData, pseudo: strin
                             <TableCell align="center">{user.lastScore ?? '-'}</TableCell>
                             <TableCell align="center">{user.totalScore}</TableCell>
                         </TableRow>
-                    )
                 ))}
                 </TableBody>
                 <TableFooter>
                     {!roomData.hasStarted && (
                         <TableCell align="center" colSpan={3}>
-                            <Typography variant="h6">{"Nombre de joueurs: " + Object.keys(roomData.users).filter((userPseudo) => userPseudo !== roomData.creator && userPseudo !== 'Eleus-IA').length}</Typography>
+                            <Typography variant="h6">{"Nombre de joueurs: " + Object.keys(roomData.users).filter((userPseudo) => userPseudo !== 'Eleus-IA').length}</Typography>
                         </TableCell>
                         )
                     }

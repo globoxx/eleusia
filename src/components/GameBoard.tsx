@@ -11,7 +11,7 @@ import PointsModal from './Modals/PointsModal';
 import Timer from './Timer';
 import UsersTable from './UsersTable';
 
-const minPlayers = 1;
+const minPlayers = 0;
 const EndOfGameModal = React.lazy(() => import('./Modals/EndOfGameModal'));
 
 const marks = [
@@ -67,6 +67,7 @@ type GameBoardProps = {
   pseudo: string;
   room: string;
   roomData: ClientRoomData;
+  isCreator: boolean;
   callbackLeaveRoom: () => void;
 };
 
@@ -74,7 +75,7 @@ function isCreatorRoomData(roomData: ClientRoomData): roomData is CreatorRoomDat
   return 'rule' in roomData;
 }
 
-function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBoardProps) {
+function GameBoard({ socket, pseudo, room, roomData, isCreator: isRoomCreator, callbackLeaveRoom }: GameBoardProps) {
   const [timer, setTimer] = useState<number>(0);
   const [timerKey, setTimerKey] = useState<number>(0);
   const [waitOnCreator, setWaitOnCreator] = useState(false);
@@ -87,7 +88,6 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
   const [isPointsModalOpen, setIsPointsModalOpen] = useState(false);
   const [modalPoints, setModalPoints] = useState(0);
 
-  const isRoomCreator = pseudo === roomData.creator;
   const isAutoRun = roomData.autoRun;
   const acceptedImages = roomData.roundHistory.filter((round) => round.label === 'Accepté').map((round) => round.image);
   const refusedImages = roomData.roundHistory.filter((round) => round.label === 'Refusé').map((round) => round.image);
@@ -341,7 +341,7 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
               <UsersTable roomData={roomData} pseudo={pseudo} />
             </Box>
             {isRoomCreator && !roomData.hasStarted ? (
-              <Button variant="contained" onClick={handleClickStartGame} disabled={Object.keys(roomData.users).length < minPlayers}>
+              <Button variant="contained" onClick={handleClickStartGame} disabled={Object.keys(roomData.users).filter((userPseudo) => userPseudo !== 'Eleus-IA').length < minPlayers}>
                 Démarrer la partie
               </Button>
             ) : null}
@@ -365,7 +365,7 @@ function GameBoard({ socket, pseudo, room, roomData, callbackLeaveRoom }: GameBo
             open={roomData.hasFinished}
             rule={roomData.revealedRule ?? ''}
             pseudo={pseudo}
-            creatorPseudo={roomData.creator}
+            isCreator={isRoomCreator}
             roundHistory={roomData.roundHistory}
           />
         </Suspense>

@@ -17,7 +17,6 @@ const catalog: ImageCatalog = {
 };
 
 const validInput = {
-  pseudo: 'Teacher',
   roomId: 'room 1',
   roundDuration: 10,
   imageSet: 'cards',
@@ -77,16 +76,16 @@ test('validates create room payload against available image catalog', () => {
 test('creates a room with creator and special AI participant', () => {
   const room = createRoomData(validInput, 'socket-1', catalog, 'token-1');
 
-  expect(room.creator).toBe('Teacher');
-  expect(room.users.Teacher.socketId).toBe('socket-1');
-  expect(room.users.Teacher.participantToken).toBe('token-1');
+  expect(room.creator.socketId).toBe('socket-1');
+  expect(room.creator.creatorToken).toBe('token-1');
+  expect(room.users.Teacher).toBeUndefined();
   expect(room.users[AI_PSEUDO]).toBeDefined();
   expect(room.images).toEqual(catalog.cards);
 });
 
 test('builds public and creator room payloads without leaking private state', () => {
   const room = createRoomData(validInput, 'socket-1', catalog, 'token-1');
-  room.users.Teacher.vote = 1;
+  room.creator.vote = 1;
 
   const publicRoom = buildPublicRoomData(room);
   const creatorRoom = buildCreatorRoomData(room);
@@ -94,9 +93,9 @@ test('builds public and creator room payloads without leaking private state', ()
   expect(publicRoom).not.toHaveProperty('rule');
   expect(publicRoom).not.toHaveProperty('acceptedImages');
   expect(publicRoom).not.toHaveProperty('refusedImages');
-  expect(publicRoom.users.Teacher).not.toHaveProperty('socketId');
-  expect(publicRoom.users.Teacher).not.toHaveProperty('participantToken');
-  expect(publicRoom.users.Teacher).not.toHaveProperty('vote');
+  expect(publicRoom).not.toHaveProperty('creator');
+  expect(publicRoom).not.toHaveProperty('creatorToken');
+  expect(publicRoom.users.Teacher).toBeUndefined();
   expect(creatorRoom.rule).toBe(validInput.rule);
   expect(creatorRoom.acceptedImages).toEqual(validInput.acceptedImages);
   expect(creatorRoom.refusedImages).toEqual(validInput.refusedImages);

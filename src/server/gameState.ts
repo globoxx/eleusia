@@ -12,7 +12,6 @@ export const MAX_ROUND_DURATION = 120;
 export const MAX_SIZE_LIMIT = 1000;
 
 export interface CreateRoomInput {
-  pseudo: string;
   roomId: string;
   roundDuration: number;
   imageSet: string;
@@ -86,15 +85,14 @@ export function createUser(socketId: string, participantToken: string | null = n
 }
 
 export function countPlayers(roomData: RoomData): number {
-  return Object.keys(roomData.users).filter((pseudo) => pseudo !== roomData.creator && pseudo !== AI_PSEUDO).length;
+  return Object.keys(roomData.users).filter((pseudo) => pseudo !== AI_PSEUDO).length;
 }
 
 export function hasHumanUsers(roomData: RoomData): boolean {
-  return Object.values(roomData.users).some((user) => user.socketId !== AI_SOCKET_ID);
+  return roomData.creator.connected || Object.values(roomData.users).some((user) => user.socketId !== AI_SOCKET_ID);
 }
 
 export function validateCreateRoomInput(input: CreateRoomInput, allImages: ImageCatalog): ValidationResult {
-  if (!isValidPseudo(input.pseudo)) return { ok: false, reason: 'invalidPseudo' };
   if (!isValidRoomId(input.roomId)) return { ok: false, reason: 'invalidRoom' };
   if (!isValidRoundDuration(input.roundDuration)) return { ok: false, reason: 'invalidRoundDuration' };
   if (!isValidSizeLimit(input.sizeLimit)) return { ok: false, reason: 'invalidSizeLimit' };
@@ -128,13 +126,20 @@ export function validateCreateRoomInput(input: CreateRoomInput, allImages: Image
   return { ok: true };
 }
 
-export function createRoomData(input: CreateRoomInput, creatorSocketId: string, allImages: ImageCatalog, participantToken: string): RoomData {
+export function createRoomData(input: CreateRoomInput, creatorSocketId: string, allImages: ImageCatalog, creatorToken: string): RoomData {
   const images = allImages[input.imageSet] ?? [];
 
   return {
     rule: input.rule.trim(),
     roundDuration: input.roundDuration,
-    creator: input.pseudo,
+    creator: {
+      socketId: creatorSocketId,
+      creatorToken,
+      connected: true,
+      disconnectedAt: null,
+      vote: null,
+      voteRoundId: null,
+    },
     autoRun: input.autoRun,
     hasAI: input.hasAI,
     status: 'lobby',
@@ -153,7 +158,6 @@ export function createRoomData(input: CreateRoomInput, creatorSocketId: string, 
     roundHistory: [],
     sizeLimit: input.sizeLimit,
     users: {
-      [input.pseudo]: createUser(creatorSocketId, participantToken),
       ...(input.hasAI ? { [AI_PSEUDO]: createUser(AI_SOCKET_ID) } : {}),
     },
   };
@@ -180,7 +184,7 @@ export function buildPublicRoomData(roomData: RoomData): PublicRoomData {
   return {
     status: roomData.status,
     roundDuration: roomData.roundDuration,
-    creator: roomData.creator,
+    creatorConnected: roomData.creator.connected,
     autoRun: roomData.autoRun,
     hasAI: roomData.hasAI,
     paused: roomData.status === 'paused',
@@ -206,6 +210,6 @@ export function buildCreatorRoomData(roomData: RoomData): CreatorRoomData {
   };
 }
 
-export function buildClientRoomData(roomData: RoomData, pseudo: string): ClientRoomData {
-  return pseudo === roomData.creator ? buildCreatorRoomData(roomData) : buildPublicRoomData(roomData);
+export function buildClientRoomData(roomData: RoomData, isCreator: boolean): ClientRoomData {
+  return isCreator ? buildCreatorRoomData(roomData) : buildPublicRoomData(roomData);
 }

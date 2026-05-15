@@ -36,7 +36,7 @@ test('creates and joins rooms with acknowledgements without leaking creator-only
   const creatorData = await creatorUpdatePromise;
 
   expect(createAck.ok).toBe(true);
-  expect(createAck.ok ? createAck.participantToken : '').toHaveLength(36);
+  expect(createAck.ok && createAck.role === 'creator' ? createAck.creatorToken : '').toHaveLength(36);
   expect('rule' in creatorData).toBe(true);
 
   const playerUpdatePromise = once<ClientRoomData>(player, 'updateRoomData');
@@ -75,6 +75,7 @@ test('reconnects a disconnected player with a valid session token', async () => 
   await emitWithAck<RoomAck>(creator, 'createRoom', createPayload());
   const joinAck = await emitWithAck<RoomAck>(player, 'joinRoom', { roomId: 'room1', pseudo: 'Alice' });
   if (!joinAck.ok) throw new Error(joinAck.reason);
+  if (joinAck.role !== 'player') throw new Error('Expected player ack');
 
   player.close();
   const reconnectedPlayer = await connectClient(url);
@@ -88,6 +89,67 @@ test('reconnects a disconnected player with a valid session token', async () => 
 
   expect(reconnectAck.ok).toBe(true);
   expect(roomData.users.Alice.connected).toBe(true);
+});
+
+test('reconnects a disconnected creator with a valid creator token', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const creator = await connectClient(url);
+
+  const createAck = await emitWithAck<RoomAck>(creator, 'createRoom', createPayload());
+  if (!createAck.ok) throw new Error(createAck.reason);
+  if (createAck.role !== 'creator') throw new Error('Expected creator ack');
+
+  creator.close();
+  const reconnectedCreator = await connectClient(url);
+  const reconnectUpdatePromise = once<ClientRoomData>(reconnectedCreator, 'updateRoomData');
+  const reconnectAck = await emitWithAck<RoomAck>(reconnectedCreator, 'reconnectCreator', {
+    roomId: 'room1',
+    creatorToken: createAck.creatorToken,
+  });
+  const roomData = await reconnectUpdatePromise;
+
+  expect(reconnectAck.ok).toBe(true);
+  expect(roomData.creatorConnected).toBe(true);
+});
+
+test('creation and launch do not require a creator pseudo and never add the creator to users', async () => {
+  const teacherStore = new MemoryTeacherStore();
+  const { server, url } = await startTestServer(120000, teacherStore);
+  createdServers.push(server);
+  const creator = await connectClient(url);
+
+  const createAck = await emitWithAck<RoomAck>(creator, 'createRoom', createPayload());
+  expect(createAck.ok).toBe(true);
+  expect(server.data.room1.users.Teacher).toBeUndefined();
+
+  const registerResponse = await fetch(`${url}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'nopseudo@example.com', password: 'password-123' }),
+  });
+  const cookie = readSetCookie(registerResponse);
+  const templateResponse = await fetch(`${url}/api/teacher/room-templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({
+      name: 'No pseudo',
+      roundDuration: 10,
+      imageSet: 'cards',
+      rule: 'Accept red cards',
+      autoRun: true,
+      hasAI: false,
+      sizeLimit: 30,
+      refusedImages: ['images/cards/1.png'],
+      acceptedImages: ['images/cards/2.png'],
+    }),
+  });
+  const { template } = (await templateResponse.json()) as { template: { id: string } };
+  const persistentCreator = await connectClient(url, cookie);
+  const launchAck = await emitWithAck<RoomAck>(persistentCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-2' });
+
+  expect(launchAck.ok).toBe(true);
+  expect(server.data['CLASS-2'].users.Teacher).toBeUndefined();
 });
 
 test('expires the creator after the reconnection grace period and reveals the rule', async () => {
@@ -214,11 +276,12 @@ test('registers a teacher, stores a template, and launches it as a persistent li
 
   const creator = await connectClient(url, cookie);
   const creatorUpdatePromise = once<ClientRoomData>(creator, 'updateRoomData');
-  const launchAck = await emitWithAck<RoomAck>(creator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1', pseudo: 'Teacher' });
+  const launchAck = await emitWithAck<RoomAck>(creator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1' });
   const creatorRoomData = await creatorUpdatePromise;
 
   expect(launchAck.ok).toBe(true);
   if (!launchAck.ok) throw new Error(launchAck.reason);
+  if (launchAck.role !== 'creator') throw new Error('Expected creator ack');
   expect(launchAck.sessionId).toBeTruthy();
   expect(launchAck.roomId).toBe('CLASS-1');
   expect('rule' in creatorRoomData).toBe(true);
@@ -263,18 +326,18 @@ test('rejects only active duplicate live room codes and allows reusing a finishe
   const { template } = (await templateResponse.json()) as { template: { id: string } };
 
   const firstCreator = await connectClient(url, cookie);
-  const firstAck = await emitWithAck<RoomAck>(firstCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1', pseudo: 'Teacher' });
+  const firstAck = await emitWithAck<RoomAck>(firstCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1' });
   expect(firstAck.ok).toBe(true);
 
   const secondCreator = await connectClient(url, cookie);
-  const activeDuplicateAck = await emitWithAck<RoomAck>(secondCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1', pseudo: 'Teacher2' });
+  const activeDuplicateAck = await emitWithAck<RoomAck>(secondCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1' });
   expect(activeDuplicateAck).toEqual({ ok: false, reason: 'roomAlreadyExists' });
 
   firstCreator.emit('endGame', 'CLASS-1');
   await waitForRoomData(firstCreator, (roomData) => roomData.status === 'finished');
   delete server.data['CLASS-1'];
 
-  const replayAck = await emitWithAck<RoomAck>(secondCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1', pseudo: 'Teacher2' });
+  const replayAck = await emitWithAck<RoomAck>(secondCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1' });
   expect(replayAck.ok).toBe(true);
 
   const sessions = await teacherStore.listRoomSessions((await teacherStore.findTeacherByEmail('reuse@example.com'))?.id ?? '');
@@ -300,7 +363,6 @@ function createStaticFixture() {
 
 function createPayload(): CreateRoomPayload {
   return {
-    pseudo: 'Teacher',
     roomId: 'room1',
     roundDuration: 10,
     imageSet: 'cards',
