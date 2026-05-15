@@ -5,7 +5,7 @@ import { Box, CircularProgress, Grid, Paper, Slider, Stack, Typography } from '@
 import Button from '@mui/material/Button';
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import type { ClientRoomData, CreatorRoomData, NewRoundPayload } from '../shared/types';
+import type { ClientRoomData, CreatorRoomData, NewRoundPayload, TrainingExample } from '../shared/types';
 import { isFinished, isLobby, isPaused } from '../shared/roomStatus';
 import ImagesContainer from './ImagesContainer';
 import PointsModal from './Modals/PointsModal';
@@ -35,10 +35,20 @@ async function initializeModel(model: AIModel) {
   model.loadModel();
 }
 
-async function trainModel(model: AIModel, images: string[], labels: number[]) {
-  const imgs = await Promise.all(images.map(async (image) => createImageElement(image)));
+function trainingLabelToNumber(label: TrainingExample['label']) {
+  return label === 'Accepté' ? 1 : 0;
+}
+
+async function trainModel(model: AIModel, examples: TrainingExample[]) {
+  const imgs = await Promise.all(
+    examples.map(async ({ image }) => ({
+      imageUrl: image,
+      image: await createImageElement(image),
+    })),
+  );
   if (model.model && model.featureExtractor) {
-    await model.trainModel(imgs, labels);
+    model.resetModel();
+    await model.trainModel(imgs, examples.map((example) => trainingLabelToNumber(example.label)));
     return;
   }
 
@@ -48,7 +58,7 @@ async function trainModel(model: AIModel, images: string[], labels: number[]) {
 async function predictImage(model: AIModel, image: string) {
   const img = await createImageElement(image);
   if (model.model && model.featureExtractor) {
-    return model.predictImage(img);
+    return model.predictImage(img, image);
   }
 
   throw new Error('Model or feature extractor not loaded');
@@ -141,17 +151,22 @@ function GameBoard({ socket, pseudo, room, roomData, role, callbackLeaveRoom }: 
     }
 
     let cancelled = false;
+    let loadedModel: AIModel | null = null;
     setModelReady(false);
 
     loadAIModel()
       .then(async (model) => {
+        loadedModel = model;
         await initializeModel(model);
         if (!cancelled) {
           setAiModel(model);
           setModelReady(true);
+        } else {
+          model.dispose();
         }
       })
       .catch((error: unknown) => {
+        loadedModel?.dispose();
         if (!cancelled) {
           setAiModel(null);
           setModelReady(false);
@@ -161,11 +176,12 @@ function GameBoard({ socket, pseudo, room, roomData, role, callbackLeaveRoom }: 
 
     return () => {
       cancelled = true;
+      loadedModel?.dispose();
     };
   }, [isRoomCreator, roomData.hasAI]);
 
   useEffect(() => {
-    const onNewRound = async ({ roundId, image }: NewRoundPayload) => {
+    const onNewRound = async ({ roundId, image, trainingExamples }: NewRoundPayload) => {
       setCurrentImage(image);
       setVote(0);
       setVotingDisabled(false);
@@ -177,14 +193,9 @@ function GameBoard({ socket, pseudo, room, roomData, role, callbackLeaveRoom }: 
         socket.emit('vote', { roomId: room, roundId, vote: creatorVote });
       }
 
-      const acceptedHistory = roomData.roundHistory.filter((round) => round.label === 'Accepté').map((round) => round.image);
-      const refusedHistory = roomData.roundHistory.filter((round) => round.label === 'Refusé').map((round) => round.image);
-      if (isRoomCreator && roomData.hasAI && modelReady && aiModel && (acceptedHistory.length > 0 || refusedHistory.length > 0)) {
-        const trainingImages = acceptedHistory.concat(refusedHistory);
-        const trainingLabels = Array(acceptedHistory.length).fill(1).concat(Array(refusedHistory.length).fill(0));
-
+      if (isRoomCreator && roomData.hasAI && modelReady && aiModel && trainingExamples.length > 0) {
         try {
-          await trainModel(aiModel, trainingImages, trainingLabels);
+          await trainModel(aiModel, trainingExamples);
           const prediction = await predictImage(aiModel, image);
           const acceptedProbability = prediction[1] ?? 0.5;
           const aiVote = Number(((acceptedProbability - 0.5) * 2).toFixed(2));

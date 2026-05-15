@@ -355,6 +355,10 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
         isAiVote: true,
       });
       if (!result.ok) {
+        if (['staleRound', 'voteClosed', 'duplicateVote'].includes(result.reason)) {
+          log('ai_vote_ignored', { socketId: socket.id, reason: result.reason });
+          return;
+        }
         reject(socket, result.reason);
         return;
       }
@@ -607,13 +611,17 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
     const roomData = data[roomId];
     if (!roomData) return;
 
+    const trainingExamples = roomData.roundHistory.map((round) => ({
+      image: round.image,
+      label: round.label,
+    }));
     const result = startNextRound(roomData);
     if (result.type === 'finished') {
       finishRoom(roomId);
       return;
     }
 
-    io.in(roomId).emit('newRound', { roundId: result.roundId, image: result.image });
+    io.in(roomId).emit('newRound', { roundId: result.roundId, image: result.image, trainingExamples });
     emitRoomData(roomId);
   }
 
@@ -623,7 +631,8 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       if (roomData.status !== 'running' || !roomData.currentRoundId) continue;
 
       roomData.timer -= 1;
-      if (Object.values(roomData.users).every((user) => !user.connected || user.voteRoundId === roomData.currentRoundId)) {
+      const connectedHumanPlayers = Object.entries(roomData.users).filter(([pseudo, user]) => pseudo !== AI_PSEUDO && user.connected);
+      if (connectedHumanPlayers.length > 0 && connectedHumanPlayers.every(([, user]) => user.voteRoundId === roomData.currentRoundId)) {
         roomData.timer = 0;
       }
 

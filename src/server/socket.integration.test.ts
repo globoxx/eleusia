@@ -5,7 +5,7 @@ import { AddressInfo } from 'net';
 import { io as createClient, Socket } from 'socket.io-client';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createGameServer } from '../../server';
-import type { ClientRoomData, CreateRoomPayload, RoomAck } from '../shared/types';
+import type { ClientRoomData, CreateRoomPayload, NewRoundPayload, RoomAck } from '../shared/types';
 import { MemoryTeacherStore } from './teacherStore';
 
 const createdServers: ReturnType<typeof createGameServer>[] = [];
@@ -198,6 +198,102 @@ test('rejects stale round votes server-side', async () => {
   player.emit('vote', { roomId: 'room1', roundId: round.roundId + 1, vote: 1 });
 
   await expect(rejectionPromise).resolves.toBe('staleRound');
+});
+
+test('new round payload includes revealed training examples', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const creator = await connectClient(url);
+
+  await emitWithAck<RoomAck>(creator, 'createRoom', { ...createPayload(), autoRun: false, acceptedImages: [], refusedImages: [] });
+
+  const firstRoundPromise = once<NewRoundPayload>(creator, 'newRound');
+  creator.emit('startGame', 'room1');
+  const firstRound = await firstRoundPromise;
+
+  expect(firstRound.trainingExamples).toEqual([]);
+
+  const secondRoundPromise = once<NewRoundPayload>(creator, 'newRound');
+  creator.emit('vote', { roomId: 'room1', roundId: firstRound.roundId, vote: 1 });
+  server.data.room1.timer = 1;
+  const secondRound = await secondRoundPromise;
+
+  expect(secondRound.trainingExamples).toEqual([{ image: firstRound.image, label: 'Accepté' }]);
+});
+
+test('AI does not block early round closing after human players vote', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const creator = await connectClient(url);
+  const player = await connectClient(url);
+
+  await emitWithAck<RoomAck>(creator, 'createRoom', { ...createPayload(), autoRun: false, hasAI: true, acceptedImages: [], refusedImages: [] });
+  await emitWithAck<RoomAck>(player, 'joinRoom', { roomId: 'room1', pseudo: 'Alice' });
+
+  const newRoundPromise = once<NewRoundPayload>(creator, 'newRound');
+  creator.emit('startGame', 'room1');
+  const round = await newRoundPromise;
+
+  const closedPromise = waitForRoomData(creator, (roomData) => roomData.roundHistory.length === 1);
+  player.emit('vote', { roomId: 'room1', roundId: round.roundId, vote: 1 });
+  creator.emit('vote', { roomId: 'room1', roundId: round.roundId, vote: 1 });
+  const roomData = await closedPromise;
+
+  expect(roomData.roundHistory[0].participantResults['Eleus-IA']).toMatchObject({ vote: null, responded: false, points: 0, isAI: true });
+});
+
+test('AI-only rooms do not close immediately just because AI is non-blocking', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const creator = await connectClient(url);
+
+  await emitWithAck<RoomAck>(creator, 'createRoom', { ...createPayload(), autoRun: false, hasAI: true, acceptedImages: [], refusedImages: [] });
+
+  const newRoundPromise = once<NewRoundPayload>(creator, 'newRound');
+  creator.emit('startGame', 'room1');
+  const round = await newRoundPromise;
+  creator.emit('vote', { roomId: 'room1', roundId: round.roundId, vote: 1 });
+
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+
+  expect(server.data.room1.status).toBe('running');
+  expect(server.data.room1.roundHistory).toHaveLength(0);
+});
+
+test('ignores stale AI votes from the creator without rejecting the action', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const creator = await connectClient(url);
+
+  await emitWithAck<RoomAck>(creator, 'createRoom', { ...createPayload(), autoRun: false, hasAI: true, acceptedImages: [], refusedImages: [] });
+
+  const newRoundPromise = once<NewRoundPayload>(creator, 'newRound');
+  creator.emit('startGame', 'room1');
+  const round = await newRoundPromise;
+
+  const rejectionPromise = onceWithTimeout<string>(creator, 'actionRejected', 50);
+  creator.emit('aiVote', { roomId: 'room1', roundId: round.roundId + 1, vote: 0.5 });
+
+  await expect(rejectionPromise).resolves.toBeNull();
+});
+
+test('rejects fraudulent AI votes from players', async () => {
+  const { server, url } = await startTestServer();
+  createdServers.push(server);
+  const creator = await connectClient(url);
+  const player = await connectClient(url);
+
+  await emitWithAck<RoomAck>(creator, 'createRoom', { ...createPayload(), autoRun: false, hasAI: true, acceptedImages: [], refusedImages: [] });
+  await emitWithAck<RoomAck>(player, 'joinRoom', { roomId: 'room1', pseudo: 'Alice' });
+
+  const newRoundPromise = once<NewRoundPayload>(player, 'newRound');
+  creator.emit('startGame', 'room1');
+  const round = await newRoundPromise;
+
+  const rejectionPromise = once<string>(player, 'actionRejected');
+  player.emit('aiVote', { roomId: 'room1', roundId: round.roundId, vote: 0.5 });
+
+  await expect(rejectionPromise).resolves.toBe('invalidAiVote');
 });
 
 test('allows the creator to start alone and exposes status transitions', async () => {

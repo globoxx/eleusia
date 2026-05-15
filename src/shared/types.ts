@@ -43,6 +43,11 @@ export interface RoundHistoryItem {
   participantResults: Record<string, ParticipantRoundResult>;
 }
 
+export interface TrainingExample {
+  image: string;
+  label: RoundLabel;
+}
+
 export interface RoomData {
   rule: string;
   roundDuration: number;
@@ -169,6 +174,7 @@ export interface VotePayload {
 export interface NewRoundPayload {
   roundId: number;
   image: string;
+  trainingExamples: TrainingExample[];
 }
 
 export interface TeacherPublic {

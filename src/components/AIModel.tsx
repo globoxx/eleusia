@@ -9,8 +9,11 @@ export type ImageElement = HTMLImageElement | HTMLCanvasElement | HTMLVideoEleme
 const MyModel = {
   featureExtractor: null as tf.GraphModel | null,
   model: null as tf.Sequential | null,
+  featureCache: new Map<string, tf.Tensor>(),
 
   loadFeatureExtractor: async () => {
+    if (MyModel.featureExtractor) return;
+
     const URL = 'https://www.kaggle.com/models/google/mobilenet-v3/TfJs/small-100-224-feature-vector/1';
     MyModel.featureExtractor = await tf.loadGraphModel(URL, { fromTFHub: true });
 
@@ -21,18 +24,32 @@ const MyModel = {
   },
 
   loadModel: () => {
+    MyModel.model?.dispose();
     MyModel.model = tf.sequential();
     MyModel.model.add(tf.layers.dense({ inputShape: [1024], units: 128, activation: 'relu' }));
     MyModel.model.add(tf.layers.dense({ units: CLASS_NAMES.length, activation: 'softmax' }));
     MyModel.model.compile({
       optimizer: 'adam',
-      loss: CLASS_NAMES.length === 2 ? 'binaryCrossentropy' : 'categoricalCrossentropy',
+      loss: 'categoricalCrossentropy',
       metrics: ['accuracy'],
     });
   },
 
   resetModel: () => {
     MyModel.loadModel();
+  },
+
+  clearFeatureCache: () => {
+    for (const tensor of MyModel.featureCache.values()) {
+      tensor.dispose();
+    }
+    MyModel.featureCache.clear();
+  },
+
+  dispose: () => {
+    MyModel.clearFeatureCache();
+    MyModel.model?.dispose();
+    MyModel.model = null;
   },
 
   preprocessImage: (image: ImageElement) => {
@@ -52,7 +69,16 @@ const MyModel = {
     });
   },
 
-  trainModel: async (images: ImageElement[], labels: number[]) => {
+  getImageFeatures: (imageUrl: string, image: ImageElement) => {
+    const cachedFeatures = MyModel.featureCache.get(imageUrl);
+    if (cachedFeatures) return cachedFeatures;
+
+    const features = MyModel.preprocessImage(image);
+    MyModel.featureCache.set(imageUrl, features);
+    return features;
+  },
+
+  trainModel: async (examples: { imageUrl: string; image: ImageElement }[], labels: number[]) => {
     const model = MyModel.model;
     if (!model) {
       throw new Error('Model not loaded');
@@ -63,7 +89,8 @@ const MyModel = {
     let labelsTensor: tf.Tensor1D | null = null;
 
     try {
-      xs = tf.stack(images.map((image) => MyModel.preprocessImage(image)));
+      const features = examples.map(({ imageUrl, image }) => MyModel.getImageFeatures(imageUrl, image));
+      xs = tf.stack(features);
       labelsTensor = tf.tensor1d(labels, 'int32');
       ys = tf.oneHot(labelsTensor, CLASS_NAMES.length);
       await model.fit(xs, ys, {
@@ -78,7 +105,7 @@ const MyModel = {
     }
   },
 
-  predictImage: async (image: ImageElement) => {
+  predictImage: async (image: ImageElement, imageUrl?: string) => {
     const model = MyModel.model;
     if (!model) {
       throw new Error('Model not loaded');
@@ -89,12 +116,12 @@ const MyModel = {
     let prediction: tf.Tensor | null = null;
 
     try {
-      imageFeatures = MyModel.preprocessImage(image);
+      imageFeatures = imageUrl ? MyModel.getImageFeatures(imageUrl, image) : MyModel.preprocessImage(image);
       expandedFeatures = imageFeatures.expandDims();
       prediction = (model.predict(expandedFeatures) as tf.Tensor).squeeze();
       return Array.from(await prediction.data());
     } finally {
-      imageFeatures?.dispose();
+      if (!imageUrl) imageFeatures?.dispose();
       expandedFeatures?.dispose();
       prediction?.dispose();
     }
