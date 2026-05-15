@@ -3,7 +3,7 @@ import express from 'express';
 import * as fs from 'fs';
 import { createServer } from 'http';
 import path from 'path';
-import { randomBytes, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { Server, Socket } from 'socket.io';
 import type {
   CreateRoomPayload,
@@ -170,22 +170,25 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
         return;
       }
 
-      const roomId = generateLiveRoomId(data);
       const createPayload: CreateRoomPayload = {
         ...templateToCreatePayload(template),
         pseudo: payload.pseudo,
-        roomId,
+        roomId: payload.roomId,
       };
       const validation = validateCreateRoomInput(createPayload, allImages);
       if (!validation.ok) {
         reject(socket, validation.reason, ack);
         return;
       }
+      if (payload.roomId in data) {
+        reject(socket, 'roomAlreadyExists', ack);
+        return;
+      }
 
       const persistentSession = await teacherStore.createRoomSession({
         teacherId: teacher.id,
         templateId: template.id,
-        liveRoomId: roomId,
+        liveRoomId: payload.roomId,
         status: 'lobby',
         initialConfig: templateToPayload(template),
       });
@@ -195,14 +198,14 @@ export function createGameServer(options: CreateGameServerOptions = {}) {
       roomData.teacherId = teacher.id;
       roomData.templateId = template.id;
       roomData.persistentSessionId = persistentSession.id;
-      data[roomId] = roomData;
-      sessions.set(socket.id, { roomId, pseudo: payload.pseudo });
-      socket.join(roomId);
-      cancelRoomCleanup(roomId);
+      data[payload.roomId] = roomData;
+      sessions.set(socket.id, { roomId: payload.roomId, pseudo: payload.pseudo });
+      socket.join(payload.roomId);
+      cancelRoomCleanup(payload.roomId);
 
-      log('room_template_launched', { roomId, templateId: template.id, teacherId: teacher.id });
-      ack?.({ ok: true, roomId, pseudo: payload.pseudo, participantToken, templateId: template.id, sessionId: persistentSession.id });
-      emitRoomData(roomId);
+      log('room_template_launched', { roomId: payload.roomId, templateId: template.id, teacherId: teacher.id });
+      ack?.({ ok: true, roomId: payload.roomId, pseudo: payload.pseudo, participantToken, templateId: template.id, sessionId: persistentSession.id });
+      emitRoomData(payload.roomId);
       } catch (error: unknown) {
         log('room_template_launch_failed', { error: String(error) });
         reject(socket, 'templateLaunchFailed', ack);
@@ -780,7 +783,7 @@ function isReconnectRoomPayload(payload: unknown): payload is ReconnectRoomPaylo
 function isLaunchRoomTemplatePayload(payload: unknown): payload is LaunchRoomTemplatePayload {
   if (!payload || typeof payload !== 'object') return false;
   const input = payload as Record<string, unknown>;
-  return typeof input.templateId === 'string' && input.templateId.length > 0 && isValidPseudo(input.pseudo);
+  return typeof input.templateId === 'string' && input.templateId.length > 0 && isValidRoomId(input.roomId) && isValidPseudo(input.pseudo);
 }
 
 function isVotePayload(payload: unknown): payload is VotePayload {
@@ -788,15 +791,6 @@ function isVotePayload(payload: unknown): payload is VotePayload {
   const input = payload as Record<string, unknown>;
 
   return isValidRoomId(input.roomId) && typeof input.roundId === 'number' && Number.isInteger(input.roundId) && typeof input.vote === 'number';
-}
-
-function generateLiveRoomId(data: Data) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const code = randomBytes(4).toString('base64url').replace(/[^A-Z0-9]/gi, '').slice(0, 6).toUpperCase();
-    if (code.length === 6 && !(code in data)) return code;
-  }
-
-  return randomUUID().slice(0, 8).toUpperCase();
 }
 
 function templateToPayload(template: RoomTemplatePayload): RoomTemplatePayload {

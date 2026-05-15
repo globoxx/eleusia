@@ -204,5 +204,6 @@ export interface RoomSessionRecord {
 
 export interface LaunchRoomTemplatePayload {
   templateId: string;
+  roomId: string;
   pseudo: string;
 }

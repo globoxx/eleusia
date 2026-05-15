@@ -210,13 +210,16 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
     acceptedImages: right,
   });
 
-  const launchTemplate = (templateId: string) => {
+  const launchTemplate = (templateId: string, defaultRoomId = '') => {
     if (!pseudo) {
       alert('Choisissez un pseudo avant de lancer une room.');
       return;
     }
 
-    socket.emit('launchRoomTemplate', { templateId, pseudo }, (ack: RoomAck) => {
+    const roomId = window.prompt('Code de room à communiquer aux élèves', defaultRoomId);
+    if (!roomId) return;
+
+    socket.emit('launchRoomTemplate', { templateId, roomId, pseudo }, (ack: RoomAck) => {
       if (ack.ok) {
         callbackJoinRoom(ack.roomId, ack.pseudo, ack.participantToken);
         void refreshTeacherData();
@@ -241,7 +244,7 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
 
     const payload = (await response.json()) as { template: RoomTemplateRecord };
     await refreshTeacherData();
-    if (launchAfterSave) launchTemplate(payload.template.id);
+    if (launchAfterSave) launchTemplate(payload.template.id, payload.template.name);
   };
 
   const archiveTemplate = async (templateId: string) => {
@@ -411,7 +414,7 @@ function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callb
                           </Typography>
                         </Box>
                         <Stack direction="row" spacing={1}>
-                          <Button variant="contained" size="small" disabled={!pseudo || pseudo.length > 15} onClick={() => launchTemplate(template.id)}>
+                          <Button variant="contained" size="small" disabled={!pseudo || pseudo.length > 15} onClick={() => launchTemplate(template.id, template.name)}>
                             Lancer
                           </Button>
                           <Button variant="outlined" color="error" size="small" onClick={() => void archiveTemplate(template.id)}>

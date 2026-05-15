@@ -37,7 +37,7 @@ create table if not exists room_sessions (
   id uuid primary key default gen_random_uuid(),
   teacher_id uuid not null references teachers(id) on delete cascade,
   template_id uuid references room_templates(id) on delete set null,
-  live_room_id text not null unique,
+  live_room_id text not null,
   status text not null,
   started_at timestamptz,
   finished_at timestamptz,

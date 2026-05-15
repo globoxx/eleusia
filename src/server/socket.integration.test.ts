@@ -214,13 +214,13 @@ test('registers a teacher, stores a template, and launches it as a persistent li
 
   const creator = await connectClient(url, cookie);
   const creatorUpdatePromise = once<ClientRoomData>(creator, 'updateRoomData');
-  const launchAck = await emitWithAck<RoomAck>(creator, 'launchRoomTemplate', { templateId: template.id, pseudo: 'Teacher' });
+  const launchAck = await emitWithAck<RoomAck>(creator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1', pseudo: 'Teacher' });
   const creatorRoomData = await creatorUpdatePromise;
 
   expect(launchAck.ok).toBe(true);
   if (!launchAck.ok) throw new Error(launchAck.reason);
   expect(launchAck.sessionId).toBeTruthy();
-  expect(launchAck.roomId).toHaveLength(6);
+  expect(launchAck.roomId).toBe('CLASS-1');
   expect('rule' in creatorRoomData).toBe(true);
 
   const player = await connectClient(url);
@@ -231,6 +231,54 @@ test('registers a teacher, stores a template, and launches it as a persistent li
   expect(sessions).toHaveLength(1);
   expect(sessions[0].templateId).toBe(template.id);
   expect(sessions[0].liveRoomId).toBe(launchAck.roomId);
+});
+
+test('rejects only active duplicate live room codes and allows reusing a finished session code', async () => {
+  const teacherStore = new MemoryTeacherStore();
+  const { server, url } = await startTestServer(120000, teacherStore);
+  createdServers.push(server);
+
+  const registerResponse = await fetch(`${url}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'reuse@example.com', password: 'password-123' }),
+  });
+  const cookie = readSetCookie(registerResponse);
+
+  const templateResponse = await fetch(`${url}/api/teacher/room-templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({
+      name: 'Reusable code',
+      roundDuration: 10,
+      imageSet: 'cards',
+      rule: 'Accept red cards',
+      autoRun: true,
+      hasAI: false,
+      sizeLimit: 30,
+      refusedImages: ['images/cards/1.png'],
+      acceptedImages: ['images/cards/2.png'],
+    }),
+  });
+  const { template } = (await templateResponse.json()) as { template: { id: string } };
+
+  const firstCreator = await connectClient(url, cookie);
+  const firstAck = await emitWithAck<RoomAck>(firstCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1', pseudo: 'Teacher' });
+  expect(firstAck.ok).toBe(true);
+
+  const secondCreator = await connectClient(url, cookie);
+  const activeDuplicateAck = await emitWithAck<RoomAck>(secondCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1', pseudo: 'Teacher2' });
+  expect(activeDuplicateAck).toEqual({ ok: false, reason: 'roomAlreadyExists' });
+
+  firstCreator.emit('endGame', 'CLASS-1');
+  await waitForRoomData(firstCreator, (roomData) => roomData.status === 'finished');
+  delete server.data['CLASS-1'];
+
+  const replayAck = await emitWithAck<RoomAck>(secondCreator, 'launchRoomTemplate', { templateId: template.id, roomId: 'CLASS-1', pseudo: 'Teacher2' });
+  expect(replayAck.ok).toBe(true);
+
+  const sessions = await teacherStore.listRoomSessions((await teacherStore.findTeacherByEmail('reuse@example.com'))?.id ?? '');
+  expect(sessions.filter((session) => session.liveRoomId === 'CLASS-1')).toHaveLength(2);
 });
 
 async function startTestServer(reconnectGraceMs = 120000, teacherStore?: MemoryTeacherStore) {
