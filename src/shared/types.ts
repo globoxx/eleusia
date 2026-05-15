@@ -56,6 +56,9 @@ export interface RoomData {
   roundHistory: RoundHistoryItem[];
   sizeLimit: number;
   users: Users;
+  teacherId?: string;
+  templateId?: string;
+  persistentSessionId?: string;
 }
 
 export interface Data {
@@ -109,6 +112,8 @@ export interface RoomAckSuccess {
   roomId: string;
   pseudo: string;
   participantToken: string;
+  templateId?: string;
+  sessionId?: string;
 }
 
 export interface RoomAckFailure {
@@ -151,4 +156,53 @@ export interface VotePayload {
 export interface NewRoundPayload {
   roundId: number;
   image: string;
+}
+
+export interface TeacherPublic {
+  id: string;
+  email: string;
+}
+
+export interface AuthResponse {
+  teacher: TeacherPublic;
+}
+
+export interface RoomTemplatePayload {
+  name: string;
+  roundDuration: number;
+  imageSet: string;
+  rule: string;
+  autoRun: boolean;
+  hasAI: boolean;
+  sizeLimit: number;
+  refusedImages: string[];
+  acceptedImages: string[];
+}
+
+export interface RoomTemplateRecord extends RoomTemplatePayload {
+  id: string;
+  teacherId: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+}
+
+export interface RoomSessionRecord {
+  id: string;
+  teacherId: string;
+  templateId: string | null;
+  liveRoomId: string;
+  status: RoomStatus;
+  startedAt: string | null;
+  finishedAt: string | null;
+  initialConfig: RoomTemplatePayload;
+  roundHistory: RoundHistoryItem[];
+  finalUsers: PublicUsers;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LaunchRoomTemplatePayload {
+  templateId: string;
+  pseudo: string;
 }

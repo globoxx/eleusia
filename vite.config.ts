@@ -11,6 +11,7 @@ export default defineConfig({
       },
       '/images': 'http://localhost:5000',
       '/images_to_download': 'http://localhost:5000',
+      '/api': 'http://localhost:5000',
     },
   },
   build: {

@@ -33,6 +33,7 @@ test('joins by direct room code without needing a published room list', () => {
   const { container } = render(
     <Home
       socket={socket}
+      teacher={null}
       callbackPseudoChange={vi.fn()}
       callbackRoomChange={vi.fn()}
       callbackJoinRoom={callbackJoinRoom}
@@ -57,6 +58,7 @@ test('shows the ack error and does not enter a missing room', () => {
   const { container } = render(
     <Home
       socket={socket}
+      teacher={null}
       callbackPseudoChange={vi.fn()}
       callbackRoomChange={vi.fn()}
       callbackJoinRoom={callbackJoinRoom}

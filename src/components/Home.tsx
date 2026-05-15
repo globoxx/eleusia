@@ -23,19 +23,20 @@ import {
 import type { SelectChangeEvent } from '@mui/material';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { Socket } from 'socket.io-client';
-import type { CreateRoomPayload, ImageCatalog, JoinRoomPayload, RoomAck } from '../shared/types';
+import type { CreateRoomPayload, ImageCatalog, JoinRoomPayload, RoomAck, RoomSessionRecord, RoomTemplatePayload, RoomTemplateRecord, TeacherPublic } from '../shared/types';
 import HelpTooltip from './HelpTooltip';
 import RulesModal from './Modals/RulesModal';
 import TransferImage from './TransferImage';
 
 type HomeProps = {
   socket: Socket;
+  teacher: TeacherPublic | null;
   callbackPseudoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   callbackRoomChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   callbackJoinRoom: (room: string, pseudo: string, participantToken: string) => void;
 };
 
-function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRoom }: HomeProps) {
+function Home({ socket, teacher, callbackPseudoChange, callbackRoomChange, callbackJoinRoom }: HomeProps) {
   const [pseudo, setPseudo] = useState('');
   const [room, setRoom] = useState('');
 
@@ -51,6 +52,8 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
   const [newRoomSizeLimit, setNewRoomSizeLimit] = useState('');
   const [labelsSwitchChecked, setLabelsSwitchChecked] = useState(false);
   const [AISwitchChecked, setAISwitchChecked] = useState(false);
+  const [templates, setTemplates] = useState<RoomTemplateRecord[]>([]);
+  const [roomSessions, setRoomSessions] = useState<RoomSessionRecord[]>([]);
 
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
@@ -58,6 +61,14 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
   const labeledImagesCount = left.length + right.length;
   const missingLabelsCount = Math.max(0, selectedImages.length - labeledImagesCount);
   const labelsAreComplete = !labelsSwitchChecked || (selectedImages.length > 0 && labeledImagesCount === selectedImages.length);
+  const roomFormIsValid =
+    pseudo.length > 0 &&
+    pseudo.length <= 15 &&
+    newRoom.length > 0 &&
+    newRoomImageSet.length > 0 &&
+    newRoomRoundDuration.length > 0 &&
+    newRoomRule.length > 0 &&
+    labelsAreComplete;
 
   const handlePseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     callbackPseudoChange(e);
@@ -157,12 +168,89 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
     };
   }, [socket]);
 
+  const refreshTeacherData = useCallback(async () => {
+    if (!teacher) {
+      setTemplates([]);
+      setRoomSessions([]);
+      return;
+    }
+
+    const [templatesResponse, sessionsResponse] = await Promise.all([fetch('/api/teacher/room-templates'), fetch('/api/teacher/room-sessions')]);
+    if (templatesResponse.ok) {
+      const payload = (await templatesResponse.json()) as { templates: RoomTemplateRecord[] };
+      setTemplates(payload.templates);
+    }
+    if (sessionsResponse.ok) {
+      const payload = (await sessionsResponse.json()) as { sessions: RoomSessionRecord[] };
+      setRoomSessions(payload.sessions);
+    }
+  }, [teacher]);
+
+  useEffect(() => {
+    void refreshTeacherData();
+  }, [refreshTeacherData]);
+
   const handleRoundDurationChange = (event: SelectChangeEvent<string>) => {
     setNewRoomRoundDuration(event.target.value);
   };
 
   const handleImageSetChange = (event: SelectChangeEvent<string>) => {
     setNewRoomImageSet(event.target.value);
+  };
+
+  const buildTemplatePayload = (): RoomTemplatePayload => ({
+    name: newRoom,
+    roundDuration: parseInt(newRoomRoundDuration, 10),
+    imageSet: newRoomImageSet,
+    rule: newRoomRule,
+    autoRun: labelsSwitchChecked,
+    hasAI: AISwitchChecked,
+    sizeLimit: newRoomSizeLimitChecked && newRoomSizeLimit.length > 0 ? parseInt(newRoomSizeLimit, 10) : 1000,
+    refusedImages: left,
+    acceptedImages: right,
+  });
+
+  const launchTemplate = (templateId: string) => {
+    if (!pseudo) {
+      alert('Choisissez un pseudo avant de lancer une room.');
+      return;
+    }
+
+    socket.emit('launchRoomTemplate', { templateId, pseudo }, (ack: RoomAck) => {
+      if (ack.ok) {
+        callbackJoinRoom(ack.roomId, ack.pseudo, ack.participantToken);
+        void refreshTeacherData();
+        return;
+      }
+
+      alert(getRejectionMessage(ack.reason));
+    });
+  };
+
+  const handleClickSaveTeacherRoom = async (launchAfterSave: boolean) => {
+    const response = await fetch('/api/teacher/room-templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildTemplatePayload()),
+    });
+
+    if (!response.ok) {
+      alert('La room sauvegardée est invalide.');
+      return;
+    }
+
+    const payload = (await response.json()) as { template: RoomTemplateRecord };
+    await refreshTeacherData();
+    if (launchAfterSave) launchTemplate(payload.template.id);
+  };
+
+  const archiveTemplate = async (templateId: string) => {
+    const response = await fetch(`/api/teacher/room-templates/${templateId}`, { method: 'DELETE' });
+    if (!response.ok) {
+      alert('Impossible d’archiver cette room.');
+      return;
+    }
+    await refreshTeacherData();
   };
 
   return (
@@ -288,25 +376,70 @@ function Home({ socket, callbackPseudoChange, callbackRoomChange, callbackJoinRo
                   ) : null}
                 </Stack>
                 <TextField required label="Règle d'acceptation" multiline value={newRoomRule} onChange={(e) => setNewRoomRule(e.target.value)} variant="outlined" fullWidth />
-                <Button
-                  sx={{ marginTop: 2 }}
-                  variant="contained"
-                  disabled={
-                    pseudo.length === 0 ||
-                    newRoom.length === 0 ||
-                    newRoomImageSet.length === 0 ||
-                    newRoomRoundDuration.length === 0 ||
-                    newRoomRule.length === 0 ||
-                    !labelsAreComplete
-                  }
-                  onClick={handleClickCreateRoom}
-                >
-                  {labelsSwitchChecked ? 'Préparer la room !' : 'Créer la room et superviser !'}
-                </Button>
+                {teacher ? (
+                  <Stack direction="row" spacing={2}>
+                    <Button sx={{ marginTop: 2 }} variant="outlined" disabled={!roomFormIsValid} onClick={() => void handleClickSaveTeacherRoom(false)}>
+                      Enregistrer sans lancer
+                    </Button>
+                    <Button sx={{ marginTop: 2 }} variant="contained" disabled={!roomFormIsValid} onClick={() => void handleClickSaveTeacherRoom(true)}>
+                      Enregistrer et lancer
+                    </Button>
+                  </Stack>
+                ) : (
+                  <Button sx={{ marginTop: 2 }} variant="contained" disabled={!roomFormIsValid} onClick={handleClickCreateRoom}>
+                    {labelsSwitchChecked ? 'Préparer la room !' : 'Créer la room et superviser !'}
+                  </Button>
+                )}
               </Stack>
             </AccordionDetails>
           </Accordion>
         </Grid>
+        {teacher ? (
+          <Grid size={12}>
+            <Grid container spacing={2}>
+              <Grid size={6}>
+                <Typography variant="h5">Mes rooms sauvegardées</Typography>
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  {templates.length === 0 ? <Typography>Aucune room sauvegardée.</Typography> : null}
+                  {templates.map((template) => (
+                    <Box key={template.id} sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box>
+                          <Typography variant="subtitle1">{template.name}</Typography>
+                          <Typography variant="body2">
+                            {template.imageSet} · {template.roundDuration}s · {template.autoRun ? 'labels préparés' : 'supervision live'}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1}>
+                          <Button variant="contained" size="small" disabled={!pseudo || pseudo.length > 15} onClick={() => launchTemplate(template.id)}>
+                            Lancer
+                          </Button>
+                          <Button variant="outlined" color="error" size="small" onClick={() => void archiveTemplate(template.id)}>
+                            Archiver
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              </Grid>
+              <Grid size={6}>
+                <Typography variant="h5">Historique</Typography>
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  {roomSessions.length === 0 ? <Typography>Aucune session enregistrée.</Typography> : null}
+                  {roomSessions.slice(0, 10).map((session) => (
+                    <Box key={session.id} sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}>
+                      <Typography variant="subtitle1">Code {session.liveRoomId}</Typography>
+                      <Typography variant="body2">
+                        {session.status} · {session.roundHistory.length} round(s) · {new Date(session.createdAt).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Grid>
+            </Grid>
+          </Grid>
+        ) : null}
       </Grid>
       <RulesModal open={isRulesModalOpen} handleClose={() => setIsRulesModalOpen(false)} />
     </>
@@ -323,6 +456,11 @@ function getRejectionMessage(reason: string) {
     invalidImageSet: "Jeu d'images invalide.",
     invalidLabels: 'Labels invalides.',
     incompleteLabels: 'Toutes les images doivent être classées une seule fois.',
+    invalidTemplateLaunch: 'Lancement de room invalide.',
+    teacherStorageUnavailable: 'Le stockage enseignant est indisponible.',
+    notAuthenticated: 'Connectez-vous comme enseignant pour lancer cette room.',
+    templateNotFound: 'Room sauvegardée introuvable.',
+    templateLaunchFailed: 'Impossible de lancer cette room sauvegardée.',
     roomAlreadyExists: 'Ce numéro de room existe déjà.',
     pseudoAlreadyExists: 'Ce pseudo existe déjà dans cette room.',
     roomFull: 'Cette room est déjà pleine.',

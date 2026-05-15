@@ -6,6 +6,7 @@ import { io as createClient, Socket } from 'socket.io-client';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createGameServer } from '../../server';
 import type { ClientRoomData, CreateRoomPayload, RoomAck } from '../shared/types';
+import { MemoryTeacherStore } from './teacherStore';
 
 const createdServers: ReturnType<typeof createGameServer>[] = [];
 const createdSockets: Socket[] = [];
@@ -180,9 +181,61 @@ test('waits for the creator once and records complete round history including no
   expect(history.participantResults['Eleus-IA']).toMatchObject({ vote: null, responded: false, points: 0, isAI: true });
 });
 
-async function startTestServer(reconnectGraceMs = 120000) {
+test('registers a teacher, stores a template, and launches it as a persistent live room', async () => {
+  const teacherStore = new MemoryTeacherStore();
+  const { server, url } = await startTestServer(120000, teacherStore);
+  createdServers.push(server);
+
+  const registerResponse = await fetch(`${url}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'teacher@example.com', password: 'password-123' }),
+  });
+  expect(registerResponse.status).toBe(200);
+  const cookie = readSetCookie(registerResponse);
+
+  const templateResponse = await fetch(`${url}/api/teacher/room-templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({
+      name: 'Red cards',
+      roundDuration: 10,
+      imageSet: 'cards',
+      rule: 'Accept red cards',
+      autoRun: true,
+      hasAI: false,
+      sizeLimit: 30,
+      refusedImages: ['images/cards/1.png'],
+      acceptedImages: ['images/cards/2.png'],
+    }),
+  });
+  expect(templateResponse.status).toBe(201);
+  const { template } = (await templateResponse.json()) as { template: { id: string } };
+
+  const creator = await connectClient(url, cookie);
+  const creatorUpdatePromise = once<ClientRoomData>(creator, 'updateRoomData');
+  const launchAck = await emitWithAck<RoomAck>(creator, 'launchRoomTemplate', { templateId: template.id, pseudo: 'Teacher' });
+  const creatorRoomData = await creatorUpdatePromise;
+
+  expect(launchAck.ok).toBe(true);
+  if (!launchAck.ok) throw new Error(launchAck.reason);
+  expect(launchAck.sessionId).toBeTruthy();
+  expect(launchAck.roomId).toHaveLength(6);
+  expect('rule' in creatorRoomData).toBe(true);
+
+  const player = await connectClient(url);
+  const joinAck = await emitWithAck<RoomAck>(player, 'joinRoom', { roomId: launchAck.roomId, pseudo: 'Alice' });
+  expect(joinAck.ok).toBe(true);
+
+  const sessions = await teacherStore.listRoomSessions((await teacherStore.findTeacherByEmail('teacher@example.com'))?.id ?? '');
+  expect(sessions).toHaveLength(1);
+  expect(sessions[0].templateId).toBe(template.id);
+  expect(sessions[0].liveRoomId).toBe(launchAck.roomId);
+});
+
+async function startTestServer(reconnectGraceMs = 120000, teacherStore?: MemoryTeacherStore) {
   const staticPath = createStaticFixture();
-  const server = createGameServer({ staticPath, imagesFolder: path.join(staticPath, 'images'), nodeEnv: 'test', reconnectGraceMs });
+  const server = createGameServer({ staticPath, imagesFolder: path.join(staticPath, 'images'), nodeEnv: 'test', reconnectGraceMs, teacherStore });
   await new Promise<void>((resolve) => server.httpServer.listen(0, resolve));
   const address = server.httpServer.address() as AddressInfo;
   return { server, url: `http://127.0.0.1:${address.port.toString()}` };
@@ -212,11 +265,18 @@ function createPayload(): CreateRoomPayload {
   };
 }
 
-async function connectClient(url: string) {
-  const socket = createClient(url, { forceNew: true, reconnection: false, transports: ['websocket'] });
+async function connectClient(url: string, cookie?: string) {
+  const socket = createClient(url, { forceNew: true, reconnection: false, transports: ['websocket'], extraHeaders: cookie ? { Cookie: cookie } : undefined });
   createdSockets.push(socket);
   await once(socket, 'connect');
   return socket;
+}
+
+function readSetCookie(response: Response) {
+  const getSetCookie = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.();
+  const cookie = getSetCookie?.[0] ?? response.headers.get('set-cookie');
+  if (!cookie) throw new Error('Missing Set-Cookie header');
+  return cookie.split(';')[0];
 }
 
 function once<T>(socket: Socket, event: string) {

@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { io, Socket } from "socket.io-client";
 import GameBoard from './components/GameBoard';
 import Home from './components/Home'
-import type { ClientRoomData, ReconnectRoomPayload, RoomAck } from './shared/types';
+import TeacherAuthButton from './components/TeacherAuthButton';
+import type { AuthResponse, ClientRoomData, ReconnectRoomPayload, RoomAck, TeacherPublic } from './shared/types';
 import { Alert, Box, Snackbar } from '@mui/material';
 
 const socket: Socket = io()
@@ -38,6 +39,13 @@ function clearStoredSession() {
 }
 
 function App() {
+  const [isInGame, setIsInGame] = useState(false)
+  const [pseudo, setPseudo] = useState('')
+  const [room, setRoom] = useState('')
+  const [roomData, setRoomData] = useState<ClientRoomData | null>(null)
+  const [connectionError, setConnectionError] = useState(false)
+  const [teacher, setTeacher] = useState<TeacherPublic | null>(null)
+
   useEffect(()=>{
     const tryReconnect = () => {
       const storedSession = readStoredSession();
@@ -94,11 +102,12 @@ function App() {
     };
   },[])
 
-  const [isInGame, setIsInGame] = useState(false)
-  const [pseudo, setPseudo] = useState('')
-  const [room, setRoom] = useState('')
-  const [roomData, setRoomData] = useState<ClientRoomData | null>(null)
-  const [connectionError, setConnectionError] = useState(false)
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((response) => (response.ok ? response.json() as Promise<AuthResponse> : null))
+      .then((payload) => setTeacher(payload?.teacher ?? null))
+      .catch(() => setTeacher(null));
+  }, []);
 
   const callbackPseudoChange = (e: React.ChangeEvent<HTMLInputElement>) => {setPseudo(e.target.value)}
   const callbackRoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {setRoom(e.target.value)}
@@ -119,8 +128,9 @@ function App() {
     <Box sx={{ p: 2 }}>
       {isInGame && roomData
         ? <GameBoard socket={socket} pseudo={pseudo} room={room} roomData={roomData} callbackLeaveRoom={callbackLeaveRoom} />
-        : <Home socket={socket} callbackPseudoChange={callbackPseudoChange} callbackRoomChange={callbackRoomChange} callbackJoinRoom={callbackJoinRoom} />
+        : <Home socket={socket} teacher={teacher} callbackPseudoChange={callbackPseudoChange} callbackRoomChange={callbackRoomChange} callbackJoinRoom={callbackJoinRoom} />
       }
+      <TeacherAuthButton teacher={teacher} onTeacherChange={setTeacher} />
       <Snackbar open={connectionError} autoHideDuration={6000} onClose={() => setConnectionError(false)}>
           <Alert onClose={() => setConnectionError(false)} severity="error" sx={{ width: '100%' }}>
               Impossible de se connecter au serveur. Veuillez contacter l'administrateur du jeu.
